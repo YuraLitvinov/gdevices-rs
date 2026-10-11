@@ -28,6 +28,7 @@
 #include <QTableWidget>
 #include <algorithm>
 #include <cerrno>
+#include <cmath>
 #include <QVBoxLayout>
 #include <utility>
 
@@ -186,7 +187,7 @@ PropertiesDialog::PropertiesDialog(const Device &device, QWidget *parent) : QDia
     auto *usbLayout = new QVBoxLayout(usbPage_);
     auto *usbNotice = plainLabel(tr("ℹ️ USB configuration snapshot"), usbPage_);
     usbNotice->setToolTip(tr("Power information is declared by the active USB configuration, not measured consumption. "
-        "USB version, connection speed and device identity remain on Details. Reload properties to refresh."));
+        "USB version and speed are also available as raw values on Details. Reload properties to refresh."));
     usbLayout->addWidget(usbNotice);
     auto *usbScroll = new QScrollArea(usbPage_);
     usbScroll->setWidgetResizable(true);
@@ -779,6 +780,25 @@ void PropertiesDialog::rebuildUsb()
     };
     const auto value = [&](const QString &key) { return propertyReadValue(data.values.value(key)); };
     const auto source = [&](const QString &key) { return device().path + '/' + key; };
+    auto *connection = group(tr("Connection"));
+    const Attribute version = snapshot_.values.value("sysfs/version");
+    field(connection, tr("USB version"), propertyReadValue(version), source("version")
+        + '\n' + tr("USB specification version reported by the device descriptor; not the port's maximum capability."));
+    const Attribute speed = snapshot_.values.value("sysfs/speed");
+    QString speedText = propertyReadValue(speed);
+    if (speed.state == ReadState::Available) {
+        bool valid = false;
+        const double mbps = speed.value.toDouble(&valid);
+        if (speed.value.compare("unknown", Qt::CaseInsensitive) == 0)
+            speedText = propertyReadValue({ReadState::Unavailable, {}, 0});
+        else if (!valid || !std::isfinite(mbps) || mbps <= 0)
+            speedText = propertyReadValue({ReadState::Error, {}, EINVAL});
+        else speedText = mbps >= 1000
+            ? tr("%1 Gbps").arg(QLocale().toString(mbps / 1000, 'g', 6))
+            : tr("%1 Mbps").arg(QLocale().toString(mbps, 'g', 6));
+    }
+    field(connection, tr("Connection speed"), speedText, source("speed")
+        + '\n' + tr("Kernel-reported link rate, not measured throughput. For root hubs this describes the USB bus."));
     auto *power = group(tr("Power declarations"));
     const Attribute attributes = data.values.value("bmAttributes");
     bool valid = false;
