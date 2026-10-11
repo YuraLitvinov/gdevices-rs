@@ -1,4 +1,5 @@
 #include "deviceproperties.h"
+#include "directoryscan.h"
 #include <libudev.h>
 #ifdef QLDM_HAVE_KMOD
 #include <libkmod.h>
@@ -92,6 +93,67 @@ void sysfs(DeviceProperties &result, int fd, const char *key)
 {
     const QString name = QLatin1String(key);
     put(result, "sysfs/" + name, readText(fd, key), result.device.path + '/' + name);
+}
+NetworkProperties networkInterface(int fd, const QString &path, const QString &name)
+{
+    const Attribute index = readText(fd, "ifindex");
+    const Attribute type = readText(fd, "type");
+    bool valid = false;
+    const unsigned int number = index.value.toUInt(&valid);
+    NetworkProperties result;
+    if (index.state == ReadState::Available && valid && number)
+        result = collectNetworkProperties(name, number, type.state == ReadState::Available && type.value == "1");
+    else result.addressState = result.permanentAddress = index.state == ReadState::Available ? failure(EINVAL) : index;
+    result.name = name;
+    result.path = path;
+    result.linkType = type;
+    if (type.state != ReadState::Available) result.permanentAddress = type;
+    result.currentAddress = readText(fd, "address");
+    result.assignmentType = readText(fd, "addr_assign_type");
+    result.mtu = readText(fd, "mtu");
+    const Attribute afterIndex = readText(fd, "ifindex");
+    const bool indexChanged = index.state == ReadState::Available
+        && (afterIndex.state != ReadState::Available || afterIndex.value != index.value);
+    if (indexChanged || result.addressState.state == ReadState::Removed || result.permanentAddress.state == ReadState::Removed) {
+        result.addresses.clear();
+        const Attribute error = indexChanged
+            ? (afterIndex.state != ReadState::Available ? afterIndex : failure(EAGAIN)) : failure(ENODEV);
+        result.addressState = result.permanentAddress = result.currentAddress
+            = result.assignmentType = result.mtu = error;
+    }
+    return result;
+}
+void networkProperties(DeviceProperties &result, int fd)
+{
+    const Device &device = result.device;
+    if (device.subsystem == "net") {
+        result.network.append(networkInterface(fd, device.path, device.sysname));
+        result.networkState = available(QString());
+        return;
+    }
+    if (device.category != "network") return;
+    // A single net interface is represented by its PCI function in the device
+    // tree. Read only that function's direct net directory, never ancestor ports.
+    Descriptor directory(openat(fd, "net", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
+    if (directory.fd < 0) { result.networkState = failure(errno); return; }
+    const QString path = device.path + "/net";
+    const DirectoryNames entries = boundedDirectoryNames(path, 256);
+    if (entries.error) { result.networkState = failure(entries.error); return; }
+    result.networkState = available(QString());
+    for (const QString &name : entries.names) {
+        if (QThread::currentThread()->isInterruptionRequested()) break;
+        const QByteArray encoded = name.toUtf8();
+        Descriptor interface(openat(directory.fd, encoded.constData(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
+        if (interface.fd < 0) {
+            const Attribute error = failure(errno);
+            NetworkProperties unavailable;
+            unavailable.name = name;
+            unavailable.path = path + '/' + name;
+            unavailable.addressState = unavailable.permanentAddress = unavailable.currentAddress
+                = unavailable.assignmentType = unavailable.linkType = unavailable.mtu = error;
+            result.network.append(unavailable);
+        } else result.network.append(networkInterface(interface.fd, path + '/' + name, name));
+    }
 }
 void moduleMetadata(DeviceProperties &result, int driverFd)
 {
@@ -277,7 +339,7 @@ DeviceProperties collectDeviceProperties(const Device &device, bool cachedStorag
         else if (d.subsystem == "input") attributes = {"name", "phys", "uniq", "modalias"};
         else if (d.subsystem == "nvme") attributes = {"model", "serial", "firmware_rev", "state"};
         else if (d.subsystem == "power_supply") attributes = {"type", "manufacturer", "model_name", "serial_number", "present"};
-        else if (d.subsystem == "net") attributes = {"address", "ifindex", "operstate", "flags"};
+        else if (d.subsystem == "net") attributes = {"address", "addr_assign_type", "type", "mtu", "ifindex", "operstate", "flags"};
         else if (d.subsystem == "drm" && d.sysname.contains('-')) attributes = {"status", "enabled"};
         else if (d.subsystem == "hdaudio") attributes = {"vendor_name", "chip_name", "vendor_id", "subsystem_id", "revision_id"};
         else if (d.subsystem == "acpi") attributes = {"hid", "uid", "path", "modalias"};
@@ -292,6 +354,7 @@ DeviceProperties collectDeviceProperties(const Device &device, bool cachedStorag
         if (!QThread::currentThread()->isInterruptionRequested()) result.resources = collectDeviceResources(deviceFd.fd, d);
         if (!QThread::currentThread()->isInterruptionRequested())
             result.storage = collectStorageProperties(d, cachedStorageService);
+        if (!QThread::currentThread()->isInterruptionRequested()) networkProperties(result, deviceFd.fd);
         // Binding can change during a read even if the device instance remains.
         const Attribute afterLink = linkTarget(deviceFd.fd, "driver");
         if (afterLink.state != driverLink.state || afterLink.value != driverLink.value || afterLink.error != driverLink.error) {

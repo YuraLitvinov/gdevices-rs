@@ -124,6 +124,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | --- | --- |
 | General | Name, category, manufacturer, bus/subsystem, location, observed status and selected hardware identifiers |
 | Driver | Direct driver binding, owning module, available running version and optional installed-module metadata |
+| Network | All assigned IPv4/IPv6 addresses and masks, permanent/current/overridden MAC addresses and MTU, per interface |
 | Details | Generic properties, source attribution, advanced raw metadata and copy controls |
 | Resources | Directly reported hardware resource assignments and read/parse errors |
 | Storage | Selected storage device identity, capacity, transport, sector sizes and flags |
@@ -139,6 +140,16 @@ Properties are collected on demand. F5 refreshes the inventory; **Reload propert
 updates the open device snapshot. A removed or replaced device leaves a marked,
 read-only snapshot with reload disabled. Reconnecting a device at the same kernel
 path does not intentionally retarget the old dialog to the replacement.
+
+The **Network** tab uses an alternating-row table and also covers interfaces
+grouped under a PCI network adapter. Addresses are from the application's network
+namespace, including IPv6 link-local addresses with scope IDs. The hardware MAC
+is the driver's permanent address; zero or missing driver results are unavailable.
+An overridden MAC is the current address when it differs from the permanent
+address, or Linux reports a random, inherited or explicitly set address. If neither
+source establishes an override, its status remains unavailable. Non-Ethernet
+interfaces show MAC fields as not applicable. Opening or reloading this tab only
+reads configuration; it does not change addresses, MTU or interface state.
 
 Installed module descriptions, filenames, licenses and versions require optional
 libkmod support. Installed metadata can differ from code already loaded into the

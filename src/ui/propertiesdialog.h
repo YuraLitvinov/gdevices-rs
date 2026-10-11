@@ -33,6 +33,7 @@ private:
     void rebuildDetails();
     void rebuildResources();
     void rebuildStorage();
+    void rebuildNetwork();
     void showVolume();
     void showHealth();
     void copyResources(bool selectedOnly);
@@ -61,6 +62,8 @@ private:
     QLabel *volumesNotice_ = nullptr;
     QLabel *healthNotice_ = nullptr;
     StoragePresentation storagePresentation_;
+    QWidget *networkPage_ = nullptr;
+    QTableWidget *networkTable_ = nullptr;
     QComboBox *property_ = nullptr;
     QPlainTextEdit *value_ = nullptr;
     QLabel *source_ = nullptr;

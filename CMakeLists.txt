@@ -31,6 +31,7 @@ add_executable(qlinuxdevicemanager
     src/devices/monitorstate.h src/devices/monitorstate.cpp
     src/devices/deviceevents.h src/devices/deviceevents.cpp
     src/devices/deviceproperties.h src/devices/deviceproperties.cpp
+    src/devices/networkproperties.h src/devices/networkproperties.cpp
     src/devices/storageproperties.h src/devices/storageproperties.cpp
     src/devices/directoryscan.h
     src/devices/storagepresentation.h src/devices/storagepresentation.cpp
@@ -143,6 +144,7 @@ if(BUILD_TESTING)
     add_executable(device-search-test tests/device-search.cpp
         src/devices/devicesearch.cpp src/devices/devicesearch.h
         src/devices/deviceproperties.cpp src/devices/deviceproperties.h
+        src/devices/networkproperties.cpp src/devices/networkproperties.h
         src/devices/storageproperties.cpp src/devices/storageproperties.h
         src/devices/storagepresentation.cpp src/devices/storagepresentation.h
         src/devices/deviceresources.cpp src/devices/deviceresources.h

@@ -3,6 +3,7 @@
 #include "device.h"
 #include "deviceresources.h"
 #include "storageproperties.h"
+#include "networkproperties.h"
 #include <QByteArray>
 #include <QThread>
 
@@ -13,6 +14,8 @@ struct DeviceProperties {
     QHash<QString, QString> sources;
     DeviceResources resources;
     StorageProperties storage;
+    QVector<NetworkProperties> network;
+    Attribute networkState;
     QByteArray efiBytes;
     bool efiTruncated = false;
     ReadState state = ReadState::Unavailable;
