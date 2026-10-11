@@ -8,6 +8,18 @@
 #include <QByteArray>
 #include <QThread>
 
+// USB-specific values stay separate from generic Details metadata.
+struct UsbInterfaceProperties {
+    QString name;
+    QString path;
+    QHash<QString, Attribute> values;
+};
+struct UsbProperties {
+    QHash<QString, Attribute> values;
+    QVector<UsbInterfaceProperties> interfaces;
+    Attribute interfaceState;
+};
+
 // Owned raw results. Display labels, translations and hex formatting belong to UI.
 struct DeviceProperties {
     Device device;
@@ -18,6 +30,7 @@ struct DeviceProperties {
     QVector<NetworkProperties> network;
     Attribute networkState;
     DisplayProperties display;
+    UsbProperties usb;
     QByteArray efiBytes;
     bool efiTruncated = false;
     ReadState state = ReadState::Unavailable;

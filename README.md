@@ -130,6 +130,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | Driver | Direct driver binding, owning module, available running version and optional installed-module metadata |
 | Network | All assigned IPv4/IPv6 addresses and masks, permanent/current/overridden MAC addresses and MTU, per interface |
 | Display | Desktop-session mode resolution, desktop color depth, nominal refresh rate, rotation/reflection and output scale |
+| USB | Active configuration, declared power/current, remote wakeup capability and interface functions/drivers |
 | Details | Generic properties, source attribution, advanced raw metadata and copy controls |
 | Resources | Directly reported hardware resource assignments and read/parse errors |
 | Storage | Selected storage device identity, capacity, transport, sector sizes and flags |
@@ -195,6 +196,19 @@ fresh DRM status read or an explicit X11 output connection status. Connected
 outputs without a mode retain **No active mode**. Zero rotation is shown as
 **0°**; nonzero angles retain their counterclockwise direction.
 Use **Reload properties** to refresh the desktop configuration snapshot.
+
+The **USB** tab appears only on USB device nodes (including hubs), with grouped
+label/value sections and a copy button. It adds active/available configurations,
+configuration description, interface count, declared power source and maximum
+current, remote wakeup capability, and each direct USB interface's function codes,
+alternate setting, description and bound driver. Values are read in the properties
+worker from sysfs; no control transfers or configuration changes are performed.
+Power/current declarations are not live measurements, and remote wakeup capability
+does not mean wakeup is enabled. Voltage is not inferred. USB version, negotiated
+speed, identity, revision and bus/address metadata remain on **Details** to avoid
+duplication. Enable **Show advanced properties** there to see raw sysfs values.
+Interface snapshots are bounded to 256 direct children; read failures and changes
+during collection are reported explicitly. Use **Reload properties** to refresh.
 
 ## Storage devices, volumes and health
 

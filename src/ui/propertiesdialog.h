@@ -36,6 +36,7 @@ private:
     void rebuildStorage();
     void rebuildNetwork();
     void rebuildDisplay();
+    void rebuildUsb();
     void showVolume();
     void showHealth();
     void copyResources(bool selectedOnly);
@@ -70,6 +71,9 @@ private:
     QWidget *displayPage_ = nullptr;
     QVBoxLayout *displayGroups_ = nullptr;
     QString displayText_;
+    QWidget *usbPage_ = nullptr;
+    QVBoxLayout *usbGroups_ = nullptr;
+    QString usbText_;
     QComboBox *property_ = nullptr;
     QPlainTextEdit *value_ = nullptr;
     QLabel *source_ = nullptr;

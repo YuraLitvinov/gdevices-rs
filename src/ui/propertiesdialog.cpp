@@ -27,6 +27,7 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <algorithm>
+#include <cerrno>
 #include <QVBoxLayout>
 #include <utility>
 
@@ -179,6 +180,25 @@ PropertiesDialog::PropertiesDialog(const Device &device, QWidget *parent) : QDia
     displayLayout->addWidget(copyDisplay);
     connect(copyDisplay, &QPushButton::clicked, this, [this] {
         QApplication::clipboard()->setText(displayText_);
+    });
+    usbPage_ = new QWidget(tabs);
+    usbPage_->hide();
+    auto *usbLayout = new QVBoxLayout(usbPage_);
+    auto *usbNotice = plainLabel(tr("ℹ️ USB configuration snapshot"), usbPage_);
+    usbNotice->setToolTip(tr("Power information is declared by the active USB configuration, not measured consumption. "
+        "USB version, connection speed and device identity remain on Details. Reload properties to refresh."));
+    usbLayout->addWidget(usbNotice);
+    auto *usbScroll = new QScrollArea(usbPage_);
+    usbScroll->setWidgetResizable(true);
+    auto *usbContent = new QWidget(usbScroll);
+    usbGroups_ = new QVBoxLayout(usbContent);
+    usbGroups_->setSizeConstraint(QLayout::SetMinAndMaxSize);
+    usbScroll->setWidget(usbContent);
+    usbLayout->addWidget(usbScroll, 1);
+    auto *copyUsb = new QPushButton(tr("Copy USB properties"), usbPage_);
+    usbLayout->addWidget(copyUsb);
+    connect(copyUsb, &QPushButton::clicked, this, [this] {
+        QApplication::clipboard()->setText(usbText_);
     });
     storagePage_ = new QWidget(tabs);
     storagePage_->hide();
@@ -413,6 +433,7 @@ void PropertiesDialog::rebuild()
     rebuildStorage();
     rebuildNetwork();
     rebuildDisplay();
+    rebuildUsb();
     for (const PropertyEntry &entry : entries_) {
         if (entry.tab > 1) continue;
         QFormLayout *form = entry.tab == 0 ? general_ : driver_;
@@ -707,6 +728,139 @@ void PropertiesDialog::rebuildDisplay()
     for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
     displayGroups_->addStretch();
     displayText_ = copy.join('\n');
+}
+
+void PropertiesDialog::rebuildUsb()
+{
+    const bool applicable = device().subsystem == "usb" && device().devtype == "usb_device";
+    const int existing = tabs_->indexOf(usbPage_);
+    if (applicable && existing < 0) tabs_->insertTab(2, usbPage_, tr("USB"));
+    else if (!applicable && existing >= 0) {
+        tabs_->removeTab(existing);
+        usbPage_->hide();
+    }
+    while (QLayoutItem *item = usbGroups_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    usbText_.clear();
+    if (!applicable) return;
+    const UsbProperties &data = snapshot_.usb;
+    QVector<QGridLayout *> forms;
+    QVector<QLabel *> captions;
+    QStringList copy;
+    const auto group = [&](const QString &title) {
+        auto *box = new QGroupBox(title, usbGroups_->parentWidget());
+        auto *form = new QGridLayout(box);
+        form->setColumnStretch(1, 1);
+        forms.append(form);
+        usbGroups_->addWidget(box);
+        if (!copy.isEmpty()) copy.append(QString());
+        copy.append(title);
+        return form;
+    };
+    const auto field = [&](QGridLayout *form, const QString &caption, const QString &text, const QString &source = QString()) {
+        auto *name = new QLabel(caption, form->parentWidget());
+        name->setTextFormat(Qt::PlainText);
+        captions.append(name);
+        auto *value = plainLabel(text, form->parentWidget());
+        QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        policy.setHeightForWidth(true);
+        value->setSizePolicy(policy);
+        value->setAlignment(Qt::AlignLeading | Qt::AlignTop);
+        value->setMinimumWidth(120);
+        const QString hint = "<qt>" + source.toHtmlEscaped() + "</qt>";
+        name->setToolTip(hint);
+        value->setToolTip(hint);
+        const int row = form->count() / 2;
+        form->addWidget(name, row, 0, Qt::AlignLeading | Qt::AlignTop);
+        form->addWidget(value, row, 1);
+        copy.append(caption + ": " + text);
+    };
+    const auto value = [&](const QString &key) { return propertyReadValue(data.values.value(key)); };
+    const auto source = [&](const QString &key) { return device().path + '/' + key; };
+    auto *power = group(tr("Power declarations"));
+    const Attribute attributes = data.values.value("bmAttributes");
+    bool valid = false;
+    const uint flags = attributes.value.toUInt(&valid, 16);
+    QString supply = propertyReadValue(attributes), wake = supply;
+    if (attributes.state == ReadState::Available) {
+        if (!valid || flags > 255 || !(flags & 0x80)) {
+            supply = wake = propertyReadValue({ReadState::Error, {}, EINVAL});
+        } else {
+            supply = flags & 0x40 ? tr("Self-powered") : tr("Bus-powered");
+            wake = flags & 0x20 ? tr("Supported") : tr("Not supported");
+        }
+    }
+    field(power, tr("Power source"), supply, source("bmAttributes"));
+    field(power, tr("Declared maximum current"), value("bMaxPower"), source("bMaxPower"));
+    field(power, tr("Remote wakeup capability"), wake, source("bmAttributes"));
+    auto *configuration = group(tr("Configuration"));
+    const Attribute active = data.values.value("bConfigurationValue");
+    field(configuration, tr("Active configuration"), active.state == ReadState::Available && (active.value.isEmpty() || active.value == "0")
+        ? tr("Unconfigured") : propertyReadValue(active), source("bConfigurationValue"));
+    field(configuration, tr("Available configurations"), value("bNumConfigurations"), source("bNumConfigurations"));
+    const Attribute description = data.values.value("configuration");
+    field(configuration, tr("Description"), description.state == ReadState::Available && description.value.isEmpty()
+        ? tr("Not provided") : propertyReadValue(description), source("configuration"));
+    field(configuration, tr("Interface count"), value("bNumInterfaces"), source("bNumInterfaces"));
+    // Class descriptions are deliberately limited; retain numeric codes for
+    // vendor-specific and unfamiliar functions rather than guessing a name.
+    const auto classText = [&](const Attribute &attribute) {
+        if (attribute.state != ReadState::Available) return propertyReadValue(attribute);
+        bool ok = false;
+        const uint code = attribute.value.toUInt(&ok, 16);
+        if (!ok || code > 255) return propertyReadValue({ReadState::Error, {}, EINVAL});
+        QString name;
+        switch (code) {
+        case 0x01: name = tr("Audio"); break;
+        case 0x02: name = tr("Communications"); break;
+        case 0x03: name = tr("Human interface device"); break;
+        case 0x07: name = tr("Printer"); break;
+        case 0x08: name = tr("Mass storage"); break;
+        case 0x09: name = tr("Hub"); break;
+        case 0x0a: name = tr("CDC data"); break;
+        case 0x0b: name = tr("Smart card"); break;
+        case 0x0e: name = tr("Video"); break;
+        case 0xe0: name = tr("Wireless controller"); break;
+        case 0xef: name = tr("Miscellaneous"); break;
+        case 0xfe: name = tr("Application-specific"); break;
+        case 0xff: name = tr("Vendor-specific"); break;
+        }
+        const QString hex = QStringLiteral("0x%1").arg(code, 2, 16, QLatin1Char('0'));
+        return name.isEmpty() ? hex : tr("%1 (%2)").arg(name, hex);
+    };
+    if (data.interfaceState.state != ReadState::Available || data.interfaces.isEmpty()) {
+        auto *interfaces = group(tr("Interfaces"));
+        field(interfaces, tr("Interfaces"), data.interfaceState.state == ReadState::Available
+            ? tr("None observed") : propertyReadValue(data.interfaceState), device().path);
+    }
+    for (const UsbInterfaceProperties &interface : data.interfaces) {
+        auto *form = group(tr("Interface %1").arg(interface.name));
+        if (interface.values.contains("state")) {
+            field(form, tr("Status"), propertyReadValue(interface.values.value("state")), interface.path);
+            continue;
+        }
+        const auto entry = [&](const QString &key, const QString &caption) {
+            field(form, caption, propertyReadValue(interface.values.value(key)), interface.path + '/' + key);
+        };
+        entry("bInterfaceNumber", tr("Number (hex)"));
+        entry("bAlternateSetting", tr("Alternate setting"));
+        const Attribute label = interface.values.value("interface");
+        field(form, tr("Description"), label.state == ReadState::Available && label.value.isEmpty()
+            ? tr("Not provided") : propertyReadValue(label), interface.path + "/interface");
+        field(form, tr("Function class"), classText(interface.values.value("bInterfaceClass")), interface.path + "/bInterfaceClass");
+        entry("bInterfaceSubClass", tr("Subclass (hex)"));
+        entry("bInterfaceProtocol", tr("Protocol (hex)"));
+        const Attribute driver = interface.values.value("driver");
+        field(form, tr("Bound driver"), driver.state == ReadState::Available && driver.value.isEmpty()
+            ? tr("Unbound") : propertyReadValue(driver), interface.path + "/driver");
+    }
+    int captionWidth = 0;
+    for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
+    for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
+    usbGroups_->addStretch();
+    usbText_ = copy.join('\n');
 }
 
 void PropertiesDialog::rebuildStorage()
