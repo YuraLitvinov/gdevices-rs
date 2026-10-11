@@ -137,7 +137,7 @@ DisplayProperties x11(const QString &connector)
     };
     put("depth", QString::number(screen.data->root_depth), "X11 screen root depth; not panel/link bits per channel");
     if (!selected) {
-        for (const QString &key : {"resolution", "refresh", "rotation", "reflection", "scale"})
+        for (const QString key : {"resolution", "refresh", "rotation", "reflection", "scale"})
             result.values.insert(key, {ReadState::NotApplicable, {}, 0});
         return result;
     }
