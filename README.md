@@ -129,6 +129,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | General | Name, category, manufacturer, bus/subsystem, location, observed status and selected hardware identifiers |
 | Driver | Direct driver binding, owning module, available running version and optional installed-module metadata |
 | Network | All assigned IPv4/IPv6 addresses and masks, permanent/current/overridden MAC addresses and MTU, per interface |
+| Display | Desktop-session mode resolution, desktop color depth, nominal refresh rate, rotation/reflection and output scale |
 | Details | Generic properties, source attribution, advanced raw metadata and copy controls |
 | Resources | Directly reported hardware resource assignments and read/parse errors |
 | Storage | Selected storage device identity, capacity, transport, sector sizes and flags |
@@ -162,6 +163,34 @@ Installed module descriptions, filenames, licenses and versions require optional
 libkmod support. Installed metadata can differ from code already loaded into the
 kernel. Declared firmware filenames do not establish which firmware is loaded or
 its version; directly reported firmware revisions are shown where available.
+
+The **Display** tab is available on DRM output connectors and uses grouped
+label/value sections like Network. Native X11/RandR and Wayland queries run in the
+properties worker; `libxcb.so.1`, `libxcb-randr.so.0` and `libwayland-client.so.0`
+are loaded on demand, without linking the application to either session API.
+The selected Wayland session is queried directly even when the application runs
+through XWayland; a failed Wayland query never falls back to emulated X11 outputs.
+Queries do not change configuration, force detection or create a display surface.
+Reply waits are cancellable and share a two-second budget per collection.
+
+Resolution is the current physical mode before rotation/scaling. Refresh rate is
+the nominal mode rate, not a measured or instantaneous variable-refresh rate.
+X11 desktop color depth is the screen's root pixel depth, not panel/link depth;
+Wayland output protocols do not expose it, so it remains unavailable. Output scale
+is the X11 RandR transform (framebuffer pixels per output pixel, excluding desktop
+DPI) or the Wayland rotated mode/logical-size ratio. The latter is marked derived
+because logical dimensions may be rounded. Without logical-size information,
+Wayland reports its integer buffer scale explicitly. Qt application scaling is
+excluded; arbitrary X11 transforms are shown as custom instead of inventing a
+single scale factor.
+
+Session output names must match a unique kernel connector. The conventional
+X11 `HDMI-N` / kernel `HDMI-A-N` naming difference is normalized. Ambiguous
+multi-GPU names and unnamed/unmatched outputs remain unavailable rather than
+borrowing another display's settings. Older Wayland compositors need xdg-output
+v2 for names; otherwise wl_output v4 names are used. X11 queries cover the default
+X screen. Missing libraries or protocol support leave the hardware view usable.
+Use **Reload properties** to refresh the desktop configuration snapshot.
 
 ## Storage devices, volumes and health
 
@@ -284,6 +313,8 @@ Requirements:
 - CMake **3.19 or newer** and pkg-config.
 - Qt **6.8 or newer**, including Widgets and Network, and libudev development headers.
   Qt Network is used locally to decode MOK certificates; this feature makes no network requests.
+- XCB RandR and Wayland client **1.20 or newer** development headers (runtime
+  libraries are required only for the corresponding Display backend).
 - Optional QtDBus **6.8 or newer** for cached UDisks2 storage metadata.
 - Optional libkmod **30 or newer** for installed-module metadata and fallback names.
 - Optional Qt Linguist tools **6.8 or newer** to build translation catalogs.
@@ -291,7 +322,7 @@ Requirements:
 Fedora packages:
 
 ```sh
-sudo dnf install gcc-c++ cmake make pkgconf-pkg-config qt6-qtbase-devel systemd-devel
+sudo dnf install gcc-c++ cmake make pkgconf-pkg-config qt6-qtbase-devel systemd-devel libxcb-devel wayland-devel
 # Optional:
 sudo dnf install qt6-qttools-devel kmod-devel
 ```
@@ -299,7 +330,7 @@ sudo dnf install qt6-qttools-devel kmod-devel
 Debian/Ubuntu packages:
 
 ```sh
-sudo apt install g++ cmake make pkg-config qt6-base-dev libudev-dev
+sudo apt install g++ cmake make pkg-config qt6-base-dev libudev-dev libxcb-randr0-dev libwayland-dev
 # Optional:
 sudo apt install qt6-tools-dev qt6-tools-dev-tools libkmod-dev
 ```

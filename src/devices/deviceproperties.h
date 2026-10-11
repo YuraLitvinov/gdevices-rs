@@ -4,6 +4,7 @@
 #include "deviceresources.h"
 #include "storageproperties.h"
 #include "networkproperties.h"
+#include "displayproperties.h"
 #include <QByteArray>
 #include <QThread>
 
@@ -16,6 +17,7 @@ struct DeviceProperties {
     StorageProperties storage;
     QVector<NetworkProperties> network;
     Attribute networkState;
+    DisplayProperties display;
     QByteArray efiBytes;
     bool efiTruncated = false;
     ReadState state = ReadState::Unavailable;

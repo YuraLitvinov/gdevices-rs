@@ -35,6 +35,7 @@ private:
     void rebuildResources();
     void rebuildStorage();
     void rebuildNetwork();
+    void rebuildDisplay();
     void showVolume();
     void showHealth();
     void copyResources(bool selectedOnly);
@@ -66,6 +67,9 @@ private:
     QWidget *networkPage_ = nullptr;
     QVBoxLayout *networkGroups_ = nullptr;
     QString networkText_;
+    QWidget *displayPage_ = nullptr;
+    QVBoxLayout *displayGroups_ = nullptr;
+    QString displayText_;
     QComboBox *property_ = nullptr;
     QPlainTextEdit *value_ = nullptr;
     QLabel *source_ = nullptr;

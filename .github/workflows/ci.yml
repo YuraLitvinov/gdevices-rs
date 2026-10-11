@@ -18,7 +18,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build pkg-config python3 wget file \
             libudev-dev libkmod-dev libssl-dev libgl-dev libegl-dev \
-            libxkbcommon-dev libxcb-cursor0
+            libxkbcommon-dev libxcb-cursor0 libxcb-randr0-dev libwayland-dev
           pkg-config --atleast-version=30 libkmod
 
       # Ubuntu 24.04's packaged Qt is older than our required Qt 6.8.
@@ -75,6 +75,9 @@ jobs:
             --icon-file _build/AppDir/usr/share/icons/hicolor/512x512/apps/io.github.birdie-github.QLinuxDeviceManager.png \
             --library /usr/lib/x86_64-linux-gnu/libssl.so.3 \
             --library /usr/lib/x86_64-linux-gnu/libcrypto.so.3 \
+            --library /usr/lib/x86_64-linux-gnu/libxcb.so.1 \
+            --library /usr/lib/x86_64-linux-gnu/libxcb-randr.so.0 \
+            --library /usr/lib/x86_64-linux-gnu/libwayland-client.so.0 \
             --plugin qt \
             --output appimage
           test -f "$LDAI_OUTPUT"

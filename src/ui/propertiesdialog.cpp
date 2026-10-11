@@ -18,6 +18,7 @@
 #include <QSizePolicy>
 #include <QItemSelectionModel>
 #include <QLabel>
+#include <QLocale>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
@@ -157,6 +158,27 @@ PropertiesDialog::PropertiesDialog(const Device &device, QWidget *parent) : QDia
     networkLayout->addWidget(copyNetwork);
     connect(copyNetwork, &QPushButton::clicked, this, [this] {
         QApplication::clipboard()->setText(networkText_);
+    });
+    displayPage_ = new QWidget(tabs);
+    displayPage_->hide();
+    auto *displayLayout = new QVBoxLayout(displayPage_);
+    auto *displayNotice = plainLabel(tr("ℹ️ Desktop display configuration snapshot"), displayPage_);
+    displayNotice->setToolTip(tr("Resolution and refresh rate describe the configured physical mode. "
+        "Desktop color depth is not the panel or link depth. Scale excludes Qt application scaling. "
+        "Wayland scale derived from logical size may include rounding; integer scale is a fallback. "
+        "Reload properties to refresh. Unmatched or ambiguous connector names remain unavailable."));
+    displayLayout->addWidget(displayNotice);
+    auto *displayScroll = new QScrollArea(displayPage_);
+    displayScroll->setWidgetResizable(true);
+    auto *displayContent = new QWidget(displayScroll);
+    displayGroups_ = new QVBoxLayout(displayContent);
+    displayGroups_->setSizeConstraint(QLayout::SetMinAndMaxSize);
+    displayScroll->setWidget(displayContent);
+    displayLayout->addWidget(displayScroll, 1);
+    auto *copyDisplay = new QPushButton(tr("Copy display properties"), displayPage_);
+    displayLayout->addWidget(copyDisplay);
+    connect(copyDisplay, &QPushButton::clicked, this, [this] {
+        QApplication::clipboard()->setText(displayText_);
     });
     storagePage_ = new QWidget(tabs);
     storagePage_->hide();
@@ -390,6 +412,7 @@ void PropertiesDialog::rebuild()
     clearForm(driver_);
     rebuildStorage();
     rebuildNetwork();
+    rebuildDisplay();
     for (const PropertyEntry &entry : entries_) {
         if (entry.tab > 1) continue;
         QFormLayout *form = entry.tab == 0 ? general_ : driver_;
@@ -582,6 +605,100 @@ void PropertiesDialog::rebuildNetwork()
     for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
     networkGroups_->addStretch();
     networkText_ = copy.join('\n');
+}
+
+void PropertiesDialog::rebuildDisplay()
+{
+    const bool applicable = device().subsystem == "drm" && device().sysname.contains('-');
+    const int existing = tabs_->indexOf(displayPage_);
+    if (applicable && existing < 0) tabs_->insertTab(2, displayPage_, tr("Display"));
+    else if (!applicable && existing >= 0) {
+        tabs_->removeTab(existing);
+        displayPage_->hide();
+    }
+    while (QLayoutItem *item = displayGroups_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    displayText_.clear();
+    if (!applicable) return;
+    const DisplayProperties &data = snapshot_.display;
+    QVector<QGridLayout *> forms;
+    QVector<QLabel *> captions;
+    QStringList copy;
+    const auto group = [&](const QString &title) {
+        auto *box = new QGroupBox(title, displayGroups_->parentWidget());
+        auto *form = new QGridLayout(box);
+        form->setColumnStretch(1, 1);
+        forms.append(form);
+        displayGroups_->addWidget(box);
+        if (!copy.isEmpty()) copy.append(QString());
+        copy.append(title);
+        return form;
+    };
+    const auto field = [&](QGridLayout *form, const QString &caption, const QString &text, const QString &source = QString()) {
+        auto *name = new QLabel(caption, form->parentWidget());
+        name->setTextFormat(Qt::PlainText);
+        captions.append(name);
+        auto *value = plainLabel(text, form->parentWidget());
+        QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        policy.setHeightForWidth(true);
+        value->setSizePolicy(policy);
+        value->setAlignment(Qt::AlignLeading | Qt::AlignTop);
+        value->setMinimumWidth(120);
+        const QString hint = "<qt>" + source.toHtmlEscaped() + "</qt>";
+        name->setToolTip(hint);
+        value->setToolTip(hint);
+        const int row = form->count() / 2;
+        form->addWidget(name, row, 0, Qt::AlignLeading | Qt::AlignTop);
+        form->addWidget(value, row, 1);
+        copy.append(caption + ": " + text);
+    };
+    const auto raw = [&](const QString &key) {
+        return data.status.state == ReadState::Available ? data.values.value(key) : Attribute {data.status.state, {}, data.status.error};
+    };
+    const auto formatted = [&](const QString &key) {
+        const Attribute value = raw(key);
+        if (value.state != ReadState::Available) return propertyReadValue(value);
+        if (key == "resolution") return QString(value.value).replace('x', QChar(0x00d7));
+        if (key == "depth") return tr("%1 bits per pixel").arg(value.value);
+        if (key == "refresh") return tr("%1 Hz").arg(QLocale().toString(value.value.toDouble(), 'f', 2));
+        if (key == "rotation") return tr("%1° counterclockwise").arg(value.value);
+        if (key == "reflection") return value.value == "xy" ? tr("X and Y axes") : value.value == "x" ? tr("X axis")
+            : value.value == "y" ? tr("Y axis") : value.value == "vertical" ? tr("Vertical axis") : tr("None");
+        if (key == "scale") {
+            if (value.value == "custom") return tr("Custom transform");
+            const QStringList axes = value.value.split(' ');
+            const double x = axes.value(0).toDouble(), y = axes.value(1).toDouble();
+            QString text = axes.value(0) == axes.value(1) ? tr("%1×").arg(QLocale().toString(x, 'g', 6))
+                : tr("X: %1×, Y: %2×").arg(QLocale().toString(x, 'g', 6), QLocale().toString(y, 'g', 6));
+            const QString kind = data.values.value("scale_kind").value;
+            if (kind == "derived") text += tr(" (derived)");
+            if (kind == "integer") text += tr(" (integer buffer scale)");
+            return text;
+        }
+        return value.value;
+    };
+    auto *session = group(tr("Desktop session"));
+    field(session, tr("Backend"), data.backend.isEmpty() ? tr("Unavailable") : data.backend);
+    field(session, tr("Output"), data.output.isEmpty() ? tr("Unavailable") : data.output, device().path);
+    field(session, tr("Configuration"), data.status.state == ReadState::Available
+        ? (data.status.value == "inactive" ? tr("No active mode") : tr("Reported by desktop server"))
+        : propertyReadValue(data.status), tr("Read-only session query. Unavailable can mean missing runtime libraries, "
+            "an output not exposed by this session, or a protocol without usable output names."));
+    auto *mode = group(tr("Display mode"));
+    field(mode, tr("Resolution"), formatted("resolution"), data.sources.value("resolution"));
+    field(mode, tr("Desktop color depth"), formatted("depth"), data.sources.value("depth"));
+    field(mode, tr("Refresh rate"), formatted("refresh"), data.sources.value("refresh"));
+    auto *transform = group(tr("Orientation and scale"));
+    field(transform, tr("Rotation"), formatted("rotation"), data.sources.value("rotation"));
+    field(transform, tr("Reflection"), formatted("reflection"), data.sources.value("reflection"));
+    field(transform, tr("Output scale"), formatted("scale"), data.sources.value("scale"));
+    int captionWidth = 0;
+    for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
+    for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
+    displayGroups_->addStretch();
+    displayText_ = copy.join('\n');
 }
 
 void PropertiesDialog::rebuildStorage()
