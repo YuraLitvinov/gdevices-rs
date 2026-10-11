@@ -654,6 +654,13 @@ void PropertiesDialog::rebuildDisplay()
         form->addWidget(value, row, 1);
         copy.append(caption + ": " + text);
     };
+    if (data.status.state == ReadState::Available && data.status.value == "disconnected") {
+        auto *session = group(tr("Desktop session"));
+        field(session, tr("Configuration"), tr("Disconnected"), data.sources.value("configuration"));
+        displayGroups_->addStretch();
+        displayText_ = copy.join('\n');
+        return;
+    }
     const auto raw = [&](const QString &key) {
         return data.status.state == ReadState::Available ? data.values.value(key) : Attribute {data.status.state, {}, data.status.error};
     };
@@ -663,7 +670,8 @@ void PropertiesDialog::rebuildDisplay()
         if (key == "resolution") return QString(value.value).replace('x', QChar(0x00d7));
         if (key == "depth") return tr("%1 bits per pixel").arg(value.value);
         if (key == "refresh") return tr("%1 Hz").arg(QLocale().toString(value.value.toDouble(), 'f', 2));
-        if (key == "rotation") return tr("%1° counterclockwise").arg(value.value);
+        if (key == "rotation") return value.value == "0" ? tr("0°")
+            : tr("%1° counterclockwise").arg(value.value);
         if (key == "reflection") return value.value == "xy" ? tr("X and Y axes") : value.value == "x" ? tr("X axis")
             : value.value == "y" ? tr("Y axis") : value.value == "vertical" ? tr("Vertical axis") : tr("None");
         if (key == "scale") {

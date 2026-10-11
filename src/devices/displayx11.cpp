@@ -109,6 +109,7 @@ DisplayProperties x11(const QString &connector)
     if (resources->num_outputs > outputLimit || resources->num_modes > textLimit) { result.status = error(EOVERFLOW); return result; }
     xcb_randr_crtc_t selected = XCB_NONE;
     int matches = 0;
+    bool disconnected = false;
     const auto *outputs = api.outputs(resources.get());
     for (int i = 0; i < resources->num_outputs; ++i) {
         const auto info = api.reply<xcb_randr_get_output_info_reply_t>(
@@ -121,8 +122,14 @@ DisplayProperties x11(const QString &connector)
         ++matches;
         result.output = name;
         selected = info->crtc;
+        disconnected = info->connection == XCB_RANDR_CONNECTION_DISCONNECTED;
     }
     if (matches != 1) { if (matches) result.status = error(ENOTUNIQ); return result; }
+    if (disconnected) {
+        result.status = available("disconnected");
+        result.sources.insert("configuration", "RandR output connection status");
+        return result;
+    }
     result.status = available(selected ? "configured" : "inactive");
     const auto put = [&](const QString &key, const QString &value, const QString &source) {
         result.values.insert(key, available(value));

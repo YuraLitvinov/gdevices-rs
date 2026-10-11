@@ -2,11 +2,18 @@
 #include "directoryscan.h"
 #include <cerrno>
 
-DisplayProperties collectDisplayProperties(const Device &device)
+DisplayProperties collectDisplayProperties(const Device &device, const Attribute &connectionStatus)
 {
     DisplayProperties result;
     if (device.subsystem != "drm" || !device.sysname.contains('-')) {
         result.status.state = ReadState::NotApplicable;
+        return result;
+    }
+    // Read by the properties worker from the open device directory, rather
+    // than using the potentially stale enumeration snapshot.
+    if (connectionStatus.state == ReadState::Available && connectionStatus.value == "disconnected") {
+        result.status = DisplayBackend::available("disconnected");
+        result.sources.insert("configuration", device.path + "/status");
         return result;
     }
     const QString connector = device.sysname.mid(device.sysname.indexOf('-') + 1);

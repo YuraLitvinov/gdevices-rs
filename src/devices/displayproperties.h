@@ -10,4 +10,4 @@ struct DisplayProperties {
     QHash<QString, QString> sources;
 };
 
-DisplayProperties collectDisplayProperties(const Device &device);
+DisplayProperties collectDisplayProperties(const Device &device, const Attribute &connectionStatus);

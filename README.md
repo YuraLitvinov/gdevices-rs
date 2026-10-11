@@ -190,6 +190,10 @@ multi-GPU names and unnamed/unmatched outputs remain unavailable rather than
 borrowing another display's settings. Older Wayland compositors need xdg-output
 v2 for names; otherwise wl_output v4 names are used. X11 queries cover the default
 X screen. Missing libraries or protocol support leave the hardware view usable.
+Disconnected connectors show only **Configuration: Disconnected**, based on a
+fresh DRM status read or an explicit X11 output connection status. Connected
+outputs without a mode retain **No active mode**. Zero rotation is shown as
+**0°**; nonzero angles retain their counterclockwise direction.
 Use **Reload properties** to refresh the desktop configuration snapshot.
 
 ## Storage devices, volumes and health
