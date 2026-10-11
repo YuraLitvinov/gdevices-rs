@@ -103,6 +103,7 @@ void appendEfiVariables(Inventory &inventory)
         d.sysname = QString::fromUtf8(filename);
         d.subsystem = "efivarfs";
         d.category = "efi";
+        d.hidden = true; // Firmware records follow the virtual/internal visibility toggle.
         d.name = name;
         d.nameSource = "UEFI variable filename; contents not read";
         d.properties.insert("EFI_VENDOR_GUID", guid);

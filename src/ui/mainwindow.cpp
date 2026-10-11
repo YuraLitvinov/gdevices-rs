@@ -166,9 +166,9 @@ MainWindow::MainWindow()
             tree_->setFocus();
         }
     });
-    internalAction_ = view->addAction(tr("Show &virtual and internal devices"));
+    internalAction_ = view->addAction(tr("Show &all devices"));
     internalAction_->setCheckable(true);
-    internalAction_->setToolTip(tr("Include virtual devices, partitions, interface endpoints and internal kernel objects."));
+    internalAction_->setToolTip(tr("Include virtual devices, UEFI variables, partitions, disconnected display outputs, interface endpoints and internal kernel objects."));
     connect(internalAction_, &QAction::toggled, this, [this](bool show) {
         rememberTree();
         cancelSearch();

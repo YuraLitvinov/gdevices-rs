@@ -78,7 +78,7 @@ inventory changes or an F5 refresh. Storage deep search uses native metadata;
 it does not query UDisks2 for every device.
 
 Virtual and internal devices are hidden by default to keep the hardware browser
-readable. This includes partitions, USB interfaces, input and sound endpoints,
+readable. This includes UEFI variables, partitions, USB interfaces, input and sound endpoints,
 DRM card/render nodes, disconnected and disabled display outputs, and many
 transport or unbound kernel objects. Connected or enabled physical display
 outputs remain visible by default; outputs with unknown/unreadable state also
@@ -286,6 +286,9 @@ On UEFI systems exposing `/sys/firmware/efi/efivars`, the **UEFI variables** cat
 lists regular files with the world-read permission bit set. This permission filter
 also applies when running as root. Missing or inaccessible efivarfs does not
 prevent ordinary hardware discovery.
+
+The category and its subtree are hidden by default. Enable **View → Show virtual
+and internal devices** to reveal them; disabling it hides the subtree again.
 
 Names are separated into readable words; original names remain in tooltips.
 Namespace GUIDs and full filenames are shown with internal devices enabled.
