@@ -80,9 +80,16 @@ void classify(Device &d)
         d.category = "audio";
         d.hidden = d.hidden || !n.startsWith("card");
     } else if (s == "drm") {
-        d.category = n.contains('-') ? "monitor" : "display";
-        // A connector is an output, not evidence of an attached monitor.
-        d.hidden = true;
+        const bool connector = n.contains('-');
+        d.category = connector ? "monitor" : "display";
+        const Attribute status = d.attributes.value("status");
+        const Attribute enabled = d.attributes.value("enabled");
+        // Keep connected/configured outputs visible. Only hide a physical
+        // connector when both reads establish it is disconnected and disabled;
+        // unknown or failed reads must not masquerade as an unused output.
+        const bool unused = status.state == ReadState::Available && status.value == "disconnected"
+            && enabled.state == ReadState::Available && enabled.value == "disabled";
+        d.hidden = d.hidden || !connector || unused;
     } else if (s == "net") d.category = "network";
     else if (s == "bluetooth") {
         d.category = "bluetooth";

@@ -155,6 +155,10 @@ Inventory Enumerator::collect()
             d.attributes.insert("type", readAttribute(d.path + "/type"));
             d.attributes.insert("manufacturer", readAttribute(d.path + "/manufacturer"));
         }
+        if (d.subsystem == "drm" && d.sysname.contains('-')) {
+            d.attributes.insert("status", readAttribute(d.path + "/status"));
+            d.attributes.insert("enabled", readAttribute(d.path + "/enabled"));
+        }
         if (!attribute.isEmpty()) d.attributes.insert(attribute, readAttribute(d.path + '/' + attribute));
         if (d.subsystem == "pci" || d.subsystem == "pnp") {
             DeviceResources resources;

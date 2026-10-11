@@ -79,7 +79,11 @@ it does not query UDisks2 for every device.
 
 Virtual and internal devices are hidden by default to keep the hardware browser
 readable. This includes partitions, USB interfaces, input and sound endpoints,
-DRM outputs and many transport or unbound kernel objects. Their visibility is
+DRM card/render nodes, disconnected and disabled display outputs, and many
+transport or unbound kernel objects. Connected or enabled physical display
+outputs remain visible by default; outputs with unknown/unreadable state also
+remain visible. F5 rereads their kernel connection and enabled state, independently
+of X11 or Wayland. Enabled means configured, not necessarily powered on. Visibility is
 not a health or connectivity verdict. Friendly names retain kernel identifiers
 where needed to distinguish identical devices; tooltips explain their sources.
 Some related records are grouped in the default view and remain individually
