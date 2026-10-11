@@ -61,7 +61,8 @@ alone does not establish that its hardware is healthy.
 Launch `qlinuxdevicemanager` from a terminal or its desktop application entry.
 The tree starts with your computer's hostname. Select a device and open
 **Action → Properties**, use the toolbar or context menu, press **Enter** in the tree, or
-double-click the device.
+double-click a leaf device. Double-clicking an item with children expands or
+collapses its branch; Enter or **Properties** opens its properties.
 
 | Action | How to use it |
 | --- | --- |

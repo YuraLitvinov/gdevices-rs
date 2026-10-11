@@ -112,6 +112,8 @@ MainWindow::MainWindow()
     propertiesAction_->setEnabled(false);
     connect(propertiesAction_, &QAction::triggered, this, &MainWindow::openProperties);
     connect(tree_, &QTreeView::doubleClicked, this, [this](const QModelIndex &index) {
+        // QTreeView handles branch expansion/collapse; only leaves open properties.
+        if (filter_->hasChildren(index)) return;
         if (index.data(DeviceModel::NodeKeyRole).toString() == "computer"
             || !propertyTarget(index).data(DeviceModel::PathRole).toString().isEmpty()) openProperties();
     });
