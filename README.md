@@ -90,9 +90,11 @@ where needed to distinguish identical devices; tooltips explain their sources.
 Some related records are grouped in the default view and remain individually
 accessible with internal devices shown.
 
-Window geometry, toolbar visibility, the selected tree view and visibility settings
-persist across launches. The computer root starts expanded and other groups start
-collapsed; expansion and selection are retained during updates within the session.
+Every launch starts in **Devices by type**, with **Show all devices** off and the
+main toolbar visible. The computer root starts expanded so its categories are
+visible; all subtrees start collapsed. View state is not saved on exit. Window
+size and position persist, and expansion and selection are retained during
+updates within the session.
 
 ## Hardware and driver views
 

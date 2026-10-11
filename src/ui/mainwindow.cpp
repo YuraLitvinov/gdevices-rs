@@ -129,8 +129,6 @@ MainWindow::MainWindow()
     });
     auto *view = menuBar()->addMenu(tr("&View"));
     auto *views = new QActionGroup(this);
-    QSettings viewSettings;
-    const QString savedView = viewSettings.value("view/tree", "type").toString();
     for (const auto mode : {DeviceModel::View::Type, DeviceModel::View::Connection,
                            DeviceModel::View::DevicesByDriver, DeviceModel::View::DriversByDevice,
                            DeviceModel::View::DriversByType, DeviceModel::View::ResourcesByType,
@@ -139,7 +137,6 @@ MainWindow::MainWindow()
         auto *choice = view->addAction(DeviceModel::viewLabel(mode));
         choice->setCheckable(true);
         views->addAction(choice);
-        if (DeviceModel::viewId(mode) == savedView) model_->setView(mode);
         connect(choice, &QAction::triggered, this, [this, mode] {
             rememberTree();
             cancelSearch();
@@ -207,10 +204,12 @@ MainWindow::MainWindow()
 
     QSettings settings;
     restoreGeometry(settings.value("window/geometry").toByteArray());
-    restoreState(settings.value("window/state").toByteArray());
-    // Every launch starts collapsed; only refreshes within this session restore expansion.
+    // Start with Devices by type, the default visibility, and only the computer
+    // expanded. Discard legacy view settings; session updates still restore the tree.
+    settings.remove("window/state");
+    settings.remove("view/tree");
+    settings.remove("view/showInternal");
     settings.remove("tree/expanded");
-    internalAction_->setChecked(settings.value("view/showInternal", false).toBool());
     connect(tree_->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex &, const QModelIndex &) { updateStatus(); });
     qRegisterMetaType<Inventory>();
@@ -357,12 +356,8 @@ void MainWindow::updateStatus()
 }
 void MainWindow::saveSettings()
 {
-    rememberTree();
     QSettings settings;
     settings.setValue("window/geometry", saveGeometry());
-    settings.setValue("window/state", saveState());
-    settings.setValue("view/tree", DeviceModel::viewId(model_->view()));
-    settings.setValue("view/showInternal", internalAction_->isChecked());
 }
 void MainWindow::closeEvent(QCloseEvent *event)
 {
