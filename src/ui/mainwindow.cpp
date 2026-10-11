@@ -108,8 +108,7 @@ MainWindow::MainWindow()
     refreshAction_->setToolTip(tr("Re-enumerate existing kernel devices; does not rescan buses."));
     connect(refreshAction_, &QAction::triggered, this, &MainWindow::refresh);
     propertiesAction_ = action->addAction(QIcon::fromTheme("document-properties",
-        style()->standardIcon(QStyle::SP_FileDialogInfoView)), tr("&Properties…"));
-    propertiesAction_->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Return));
+        style()->standardIcon(QStyle::SP_FileDialogInfoView)), tr("&Properties"));
     propertiesAction_->setEnabled(false);
     connect(propertiesAction_, &QAction::triggered, this, &MainWindow::openProperties);
     connect(tree_, &QTreeView::doubleClicked, this, [this](const QModelIndex &index) {
@@ -448,6 +447,15 @@ void MainWindow::acceptProperties()
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if ((watched == tree_ || watched == tree_->viewport()) && event->type() == QEvent::KeyPress) {
+        const auto *key = static_cast<QKeyEvent *>(event);
+        // Keypad Enter may carry KeypadModifier; other modifiers are not activation.
+        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
+            && (key->modifiers() == Qt::NoModifier || key->modifiers() == Qt::KeypadModifier)) {
+            if (!key->isAutoRepeat() && propertiesAction_->isEnabled()) propertiesAction_->trigger();
+            return true;
+        }
+    }
     if (event->type() == QEvent::KeyPress && filterAction_->isChecked()
         && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape) {
         filterAction_->setChecked(false);

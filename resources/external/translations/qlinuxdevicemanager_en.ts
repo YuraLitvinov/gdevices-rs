@@ -569,7 +569,7 @@
     </message>
     <message>
         <location filename="../../../src/ui/mainwindow.cpp" line="111"/>
-        <source>&amp;Properties…</source>
+        <source>&amp;Properties</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

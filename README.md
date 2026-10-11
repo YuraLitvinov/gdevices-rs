@@ -60,7 +60,7 @@ alone does not establish that its hardware is healthy.
 
 Launch `qlinuxdevicemanager` from a terminal or its desktop application entry.
 The tree starts with your computer's hostname. Select a device and open
-**Action → Properties**, use the toolbar or context menu, press **Alt+Enter**, or
+**Action → Properties**, use the toolbar or context menu, press **Enter** in the tree, or
 double-click the device.
 
 | Action | How to use it |
