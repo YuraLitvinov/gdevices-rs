@@ -14,6 +14,7 @@ class QPlainTextEdit;
 class QPushButton;
 class QTabWidget;
 class QTableWidget;
+class QVBoxLayout;
 
 class PropertiesDialog final : public QDialog {
     Q_OBJECT
@@ -63,7 +64,8 @@ private:
     QLabel *healthNotice_ = nullptr;
     StoragePresentation storagePresentation_;
     QWidget *networkPage_ = nullptr;
-    QTableWidget *networkTable_ = nullptr;
+    QVBoxLayout *networkGroups_ = nullptr;
+    QString networkText_;
     QComboBox *property_ = nullptr;
     QPlainTextEdit *value_ = nullptr;
     QLabel *source_ = nullptr;

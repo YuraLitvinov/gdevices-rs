@@ -13,6 +13,9 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QSizePolicy>
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QPlainTextEdit>
@@ -143,30 +146,17 @@ PropertiesDialog::PropertiesDialog(const Device &device, QWidget *parent) : QDia
         "Hardware MAC is the permanent address reported by the driver. An overridden MAC is the current "
         "address when it differs from the permanent address, or Linux reports a random, inherited or explicitly set address."));
     networkLayout->addWidget(networkNotice);
-    networkTable_ = new QTableWidget(0, 4, networkPage_);
-    networkTable_->setHorizontalHeaderLabels({tr("Interface"), tr("Property"), tr("Value"), tr("Network mask")});
-    networkTable_->setAlternatingRowColors(true);
-    networkTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    networkTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    networkTable_->setSelectionMode(QAbstractItemView::SingleSelection);
-    networkTable_->verticalHeader()->hide();
-    networkTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
-    networkTable_->horizontalHeader()->setStretchLastSection(true);
-    networkTable_->setColumnWidth(0, 110);
-    networkTable_->setColumnWidth(1, 180);
-    networkTable_->setColumnWidth(2, 250);
-    networkLayout->addWidget(networkTable_, 1);
+    auto *networkScroll = new QScrollArea(networkPage_);
+    networkScroll->setWidgetResizable(true);
+    auto *networkContent = new QWidget(networkScroll);
+    networkGroups_ = new QVBoxLayout(networkContent);
+    networkGroups_->setSizeConstraint(QLayout::SetMinAndMaxSize);
+    networkScroll->setWidget(networkContent);
+    networkLayout->addWidget(networkScroll, 1);
     auto *copyNetwork = new QPushButton(tr("Copy network properties"), networkPage_);
     networkLayout->addWidget(copyNetwork);
     connect(copyNetwork, &QPushButton::clicked, this, [this] {
-        QStringList lines;
-        for (int row = 0; row < networkTable_->rowCount(); ++row) {
-            QStringList columns;
-            for (int column = 0; column < networkTable_->columnCount(); ++column)
-                columns.append(networkTable_->item(row, column)->text());
-            lines.append(columns.join('\t'));
-        }
-        QApplication::clipboard()->setText(lines.join('\n'));
+        QApplication::clipboard()->setText(networkText_);
     });
     storagePage_ = new QWidget(tabs);
     storagePage_->hide();
@@ -514,29 +504,55 @@ void PropertiesDialog::rebuildNetwork()
         tabs_->removeTab(existing);
         networkPage_->hide();
     }
-    networkTable_->setRowCount(0);
+    while (QLayoutItem *item = networkGroups_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    networkText_.clear();
     if (!applicable) return;
-    const auto row = [this](const QString &name, const QString &property, const QString &value,
-                            const QString &mask, const QString &source) {
-        const int index = networkTable_->rowCount();
-        networkTable_->insertRow(index);
-        const QStringList values {name, property, value, mask};
-        for (int column = 0; column < values.size(); ++column) {
-            auto *item = new QTableWidgetItem(values[column]);
-            item->setToolTip("<qt>" + source.toHtmlEscaped() + "</qt>");
-            networkTable_->setItem(index, column, item);
-        }
+    QVector<QGridLayout *> forms;
+    QVector<QLabel *> captions;
+    QStringList copy;
+    const auto group = [&](const QString &title) {
+        auto *box = new QGroupBox(title, networkGroups_->parentWidget());
+        auto *form = new QGridLayout(box);
+        form->setColumnStretch(1, 1);
+        forms.append(form);
+        networkGroups_->addWidget(box);
+        if (!copy.isEmpty()) copy.append(QString());
+        copy.append(title);
+        return form;
+    };
+    const auto field = [&](QGridLayout *form, const QString &caption, const QString &text, const QString &source) {
+        auto *name = new QLabel(caption, form->parentWidget());
+        name->setTextFormat(Qt::PlainText);
+        captions.append(name);
+        auto *value = plainLabel(text, form->parentWidget());
+        QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        policy.setHeightForWidth(true);
+        value->setSizePolicy(policy);
+        value->setAlignment(Qt::AlignLeading | Qt::AlignTop);
+        value->setMinimumWidth(120);
+        const QString hint = "<qt>" + source.toHtmlEscaped() + "</qt>";
+        name->setToolTip(hint);
+        value->setToolTip(hint);
+        const int row = form->count() / 2;
+        form->addWidget(name, row, 0, Qt::AlignLeading | Qt::AlignTop);
+        form->addWidget(value, row, 1);
+        copy.append(caption + ": " + text);
     };
     if (snapshot_.network.isEmpty()) {
-        row({}, tr("Interfaces"), snapshot_.networkState.state == ReadState::Available
-            ? tr("No network interfaces observed") : propertyReadValue(snapshot_.networkState), {}, device().path);
+        auto *form = group(tr("Network interfaces"));
+        field(form, tr("Interfaces"), snapshot_.networkState.state == ReadState::Available
+            ? tr("No network interfaces observed") : propertyReadValue(snapshot_.networkState), device().path);
     }
     for (const NetworkProperties &interface : snapshot_.network) {
+        auto *link = group(tr("%1 — Link").arg(interface.name));
         const bool noMac = interface.linkType.state == ReadState::Available && interface.linkType.value != "1";
         const Attribute current = noMac ? Attribute {ReadState::NotApplicable, {}, 0} : interface.currentAddress;
-        row(interface.name, tr("Hardware MAC address"), propertyReadValue(interface.permanentAddress), {},
+        field(link, tr("Hardware MAC address"), propertyReadValue(interface.permanentAddress),
             tr("Driver permanent address: ETHTOOL_GPERMADDR"));
-        row(interface.name, tr("Current MAC address"), propertyReadValue(current), {}, interface.path + "/address");
+        field(link, tr("Current MAC address"), propertyReadValue(current), interface.path + "/address");
         QString overrideValue;
         if (noMac) overrideValue = tr("Not applicable");
         else if (current.state != ReadState::Available) overrideValue = propertyReadValue(current);
@@ -547,18 +563,25 @@ void PropertiesDialog::rebuildNetwork()
                  && (interface.assignmentType.value == "1" || interface.assignmentType.value == "2"
                      || interface.assignmentType.value == "3")) overrideValue = current.value;
         else overrideValue = tr("Unavailable; permanent MAC could not be determined");
-        row(interface.name, tr("Overridden MAC address"), overrideValue, {},
+        field(link, tr("Overridden MAC address"), overrideValue,
             interface.path + "/address; " + interface.path + "/addr_assign_type; ETHTOOL_GPERMADDR");
-        row(interface.name, tr("MTU"), propertyReadValue(interface.mtu), {}, interface.path + "/mtu");
+        field(link, tr("MTU"), propertyReadValue(interface.mtu), interface.path + "/mtu");
+        auto *addresses = group(tr("%1 — IP addresses").arg(interface.name));
+        const QString source = tr("getifaddrs: application network namespace");
         if (interface.addresses.isEmpty()) {
-            row(interface.name, tr("IP addresses"), interface.addressState.state == ReadState::Available
-                ? tr("None assigned") : propertyReadValue(interface.addressState), {}, tr("getifaddrs: application network namespace"));
+            field(addresses, tr("IP addresses"), interface.addressState.state == ReadState::Available
+                ? tr("None assigned") : propertyReadValue(interface.addressState), source);
         }
         for (const NetworkAddress &address : interface.addresses)
-            row(interface.name, address.family == "IPv4" ? tr("IPv4 address") : tr("IPv6 address"),
-                address.address, propertyReadValue(address.netmask), tr("getifaddrs: application network namespace"));
+            field(addresses, address.family == "IPv4" ? tr("IPv4 address") : tr("IPv6 address"),
+                address.address + '/' + propertyReadValue(address.netmask), source);
     }
-    networkTable_->resizeRowsToContents();
+    // Match System Information: one font-derived caption width across sections.
+    int captionWidth = 0;
+    for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
+    for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
+    networkGroups_->addStretch();
+    networkText_ = copy.join('\n');
 }
 
 void PropertiesDialog::rebuildStorage()

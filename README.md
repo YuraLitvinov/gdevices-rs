@@ -141,9 +141,12 @@ updates the open device snapshot. A removed or replaced device leaves a marked,
 read-only snapshot with reload disabled. Reconnecting a device at the same kernel
 path does not intentionally retarget the old dialog to the replacement.
 
-The **Network** tab uses an alternating-row table and also covers interfaces
-grouped under a PCI network adapter. Addresses are from the application's network
-namespace, including IPv6 link-local addresses with scope IDs. The hardware MAC
+The **Network** tab uses grouped, aligned label/value columns like System
+Information, with Link and IP addresses sections for each interface. Each IP
+address is shown as `address/network-mask`, using the literal IPv4 or IPv6 mask.
+The tab also covers interfaces grouped under a PCI network adapter. Addresses
+are from the application's network namespace, including IPv6 link-local addresses
+with scope IDs. The hardware MAC
 is the driver's permanent address; zero or missing driver results are unavailable.
 An overridden MAC is the current address when it differs from the permanent
 address, or Linux reports a random, inherited or explicitly set address. If neither
