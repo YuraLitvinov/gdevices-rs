@@ -9,6 +9,7 @@
 #include <QFont>
 #include <QSizePolicy>
 #include <QTabWidget>
+#include <QGroupBox>
 #include <QLabel>
 #include <QLocale>
 #include <QPushButton>
@@ -96,9 +97,6 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     captions_.insert("secure_boot", tr("Secure Boot"));
     auto *mokTitle = new QLabel(tr("MOK certificates"), secureBoot->parentWidget());
     mokTitle->setTextFormat(Qt::PlainText);
-    QFont headingFont = mokTitle->font();
-    headingFont.setBold(true);
-    mokTitle->setFont(headingFont);
     secureBoot->addWidget(mokTitle, 1, 0, 1, 2);
     auto *mokPage = new QWidget(secureBoot->parentWidget());
     mokForm_ = new QGridLayout(mokPage);
@@ -311,8 +309,8 @@ void SystemDialog::rebuildMok()
              "not verification of the signer or proof that this key signed the running kernel. Dates are UTC. "
              "Firmware db certificates and pending enrollments are not included.");
     int row = 0;
-    const auto label = [this](const QString &text) {
-        auto *value = new QLabel(text, mokForm_->parentWidget());
+    const auto label = [](const QString &text, QWidget *parent) {
+        auto *value = new QLabel(text, parent);
         value->setTextFormat(Qt::PlainText);
         value->setWordWrap(true);
         value->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
@@ -327,7 +325,7 @@ void SystemDialog::rebuildMok()
         value->setToolTip("<qt>" + (scope + "\n\n" + details).toHtmlEscaped().replace('\n', "<br>") + "</qt>");
     };
     const auto message = [&](const QString &text) {
-        auto *value = label(text);
+        auto *value = label(text, mokForm_->parentWidget());
         hint(value, {});
         mokForm_->addWidget(value, row++, 0, 1, 2);
     };
@@ -338,15 +336,20 @@ void SystemDialog::rebuildMok()
     const auto known = [this](const QString &text) { return text.isEmpty() ? tr("Unavailable") : text; };
     int index = 0;
     for (const MokCertificate &certificate : mok.certificates) {
-        if (mok.certificates.size() > 1) message(tr("Certificate %1").arg(++index));
+        auto *box = new QGroupBox(tr("Certificate %1").arg(++index), mokForm_->parentWidget());
+        auto *form = new QGridLayout(box);
+        form->setColumnStretch(1, 1);
+        form->setColumnMinimumWidth(0, mokForm_->columnMinimumWidth(0));
+        mokForm_->addWidget(box, row++, 0, 1, 2);
+        int certificateRow = 0;
         const auto field = [&](const QString &caption, const QString &text, const QString &details) {
-            auto *name = new QLabel(caption, mokForm_->parentWidget());
+            auto *name = new QLabel(caption, box);
             name->setTextFormat(Qt::PlainText);
-            auto *value = label(text);
+            auto *value = label(text, box);
             hint(name, details);
             hint(value, details);
-            mokForm_->addWidget(name, row, 0, Qt::AlignLeading | Qt::AlignTop);
-            mokForm_->addWidget(value, row++, 1);
+            form->addWidget(name, certificateRow, 0, Qt::AlignLeading | Qt::AlignTop);
+            form->addWidget(value, certificateRow++, 1);
         };
         const QString owner = certificate.subjectDisplay.isEmpty() ? certificate.subject : certificate.subjectDisplay;
         const QString issuer = !certificate.subject.isEmpty() && certificate.subject == certificate.issuer
