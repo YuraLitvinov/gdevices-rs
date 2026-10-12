@@ -305,7 +305,7 @@ void usbProperties(DeviceProperties &result, int fd)
     }
 }
 
-NetworkProperties networkInterface(int fd, const QString &path, const QString &name)
+NetworkProperties networkInterface(int fd, const QString &path, const QString &name, bool ethernetDetails)
 {
     const Attribute index = readText(fd, "ifindex");
     const Attribute type = readText(fd, "type");
@@ -322,23 +322,44 @@ NetworkProperties networkInterface(int fd, const QString &path, const QString &n
     result.currentAddress = readText(fd, "address");
     result.assignmentType = readText(fd, "addr_assign_type");
     result.mtu = readText(fd, "mtu");
+    if (ethernetDetails && type.state == ReadState::Available && type.value == "1") {
+        // ARPHRD_ETHER describes MAC framing and includes Wi-Fi. Check both
+        // kernel wireless markers before issuing Ethernet-only ethtool queries.
+        bool wireless = false;
+        int scopeError = 0;
+        for (const char *marker : {"phy80211", "wireless"}) {
+            struct stat entry {};
+            if (fstatat(fd, marker, &entry, AT_SYMLINK_NOFOLLOW) == 0) wireless = true;
+            else if (errno != ENOENT) scopeError = errno;
+        }
+        if (!wireless && scopeError) {
+            result.ethernet.scope = failure(scopeError);
+            result.ethernet.source = path + "/phy80211; " + path + "/wireless";
+        } else if (!wireless && index.state == ReadState::Available && valid && number
+            && !QThread::currentThread()->isInterruptionRequested()) {
+            result.ethernet = collectEthernetProperties(name, number);
+        }
+    }
     const Attribute afterIndex = readText(fd, "ifindex");
     const bool indexChanged = index.state == ReadState::Available
         && (afterIndex.state != ReadState::Available || afterIndex.value != index.value);
-    if (indexChanged || result.addressState.state == ReadState::Removed || result.permanentAddress.state == ReadState::Removed) {
+    if (indexChanged || result.addressState.state == ReadState::Removed || result.permanentAddress.state == ReadState::Removed
+        || result.ethernet.scope.state == ReadState::Removed) {
         result.addresses.clear();
         const Attribute error = indexChanged
             ? (afterIndex.state != ReadState::Available ? afterIndex : failure(EAGAIN)) : failure(ENODEV);
         result.addressState = result.permanentAddress = result.currentAddress
             = result.assignmentType = result.mtu = error;
+        if (result.ethernet.applicable || result.ethernet.scope.state != ReadState::NotApplicable)
+            result.ethernet.invalidate(error);
     }
     return result;
 }
-void networkProperties(DeviceProperties &result, int fd)
+void networkProperties(DeviceProperties &result, int fd, bool ethernetDetails)
 {
     const Device &device = result.device;
     if (device.subsystem == "net") {
-        result.network.append(networkInterface(fd, device.path, device.sysname));
+        result.network.append(networkInterface(fd, device.path, device.sysname, ethernetDetails));
         result.networkState = available(QString());
         return;
     }
@@ -363,7 +384,7 @@ void networkProperties(DeviceProperties &result, int fd)
             unavailable.addressState = unavailable.permanentAddress = unavailable.currentAddress
                 = unavailable.assignmentType = unavailable.linkType = unavailable.mtu = error;
             result.network.append(unavailable);
-        } else result.network.append(networkInterface(interface.fd, path + '/' + name, name));
+        } else result.network.append(networkInterface(interface.fd, path + '/' + name, name, ethernetDetails));
     }
 }
 void moduleMetadata(DeviceProperties &result, int driverFd)
@@ -567,7 +588,7 @@ DeviceProperties collectDeviceProperties(const Device &device, bool cachedStorag
         if (!QThread::currentThread()->isInterruptionRequested()) result.resources = collectDeviceResources(deviceFd.fd, d);
         if (!QThread::currentThread()->isInterruptionRequested())
             result.storage = collectStorageProperties(d, cachedStorageService);
-        if (!QThread::currentThread()->isInterruptionRequested()) networkProperties(result, deviceFd.fd);
+        if (!QThread::currentThread()->isInterruptionRequested()) networkProperties(result, deviceFd.fd, cachedStorageService);
         if (cachedStorageService && !QThread::currentThread()->isInterruptionRequested())
             usbProperties(result, deviceFd.fd);
         if (cachedStorageService && !QThread::currentThread()->isInterruptionRequested())

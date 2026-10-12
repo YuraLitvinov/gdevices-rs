@@ -628,12 +628,68 @@ void PropertiesDialog::rebuildNetwork()
         form->addWidget(value, row, 1);
         copy.append(caption + ": " + text);
     };
+    const auto ethernetValue = [&](const Attribute &value) {
+        if (value.state == ReadState::Unsupported) return tr("Query unsupported by the kernel/device");
+        if (value.state == ReadState::Error) {
+            if (value.error == EPROTO) return tr("Malformed ethtool reply");
+            if (value.error == ETIMEDOUT) return tr("Query timed out");
+            if (value.error == EOVERFLOW) return tr("Reply exceeds collection limits");
+            if (value.error == EAGAIN) return tr("Link changed during collection; reload properties");
+        }
+        return propertyReadValue(value);
+    };
     if (snapshot_.network.isEmpty()) {
         auto *form = group(tr("Network interfaces"));
         field(form, tr("Interfaces"), snapshot_.networkState.state == ReadState::Available
             ? tr("No network interfaces observed") : propertyReadValue(snapshot_.networkState), device().path);
     }
     for (const NetworkProperties &interface : snapshot_.network) {
+        const EthernetProperties &ethernet = interface.ethernet;
+        if (ethernet.applicable) {
+            auto *form = group(tr("%1 — Ethernet link").arg(interface.name));
+            const QString source = interface.path + '\n' + ethernet.source;
+            const bool disconnected = ethernet.carrier.state == ReadState::Available && ethernet.carrier.value == "0";
+            field(form, tr("Link status"), ethernet.carrier.state == ReadState::Available
+                ? (disconnected ? tr("Disconnected") : tr("Connected")) : ethernetValue(ethernet.carrier), source);
+            const auto operationalValue = [&](const Attribute &value) {
+                return value.state == ReadState::NotApplicable && disconnected
+                    ? tr("Not applicable — link disconnected") : ethernetValue(value);
+            };
+            QString speed = operationalValue(ethernet.speed);
+            if (ethernet.speed.state == ReadState::Available) {
+                bool valid = false;
+                const qulonglong mbps = ethernet.speed.value.toULongLong(&valid);
+                if (!valid) speed = tr("Malformed ethtool reply");
+                else if (!mbps || mbps == 0xffffffffULL) speed = tr("Unavailable (driver reports unknown speed)");
+                else speed = mbps >= 1000
+                    ? tr("%1 Gbps").arg(QLocale().toString(static_cast<double>(mbps) / 1000, 'g', 6))
+                    : tr("%1 Mbps").arg(QLocale().toString(mbps));
+            }
+            field(form, tr("Link speed"), speed, source + '\n' + tr("Driver-reported operational speed, not measured throughput; it may be forced when autonegotiation is disabled."));
+            QString duplex = operationalValue(ethernet.duplex);
+            if (ethernet.duplex.state == ReadState::Available) {
+                if (ethernet.duplex.value == "0") duplex = tr("Half duplex");
+                else if (ethernet.duplex.value == "1") duplex = tr("Full duplex");
+                else if (ethernet.duplex.value == "255") duplex = tr("Unavailable (driver reports unknown duplex)");
+                else duplex = tr("Unrecognized duplex value: %1").arg(ethernet.duplex.value);
+            }
+            field(form, tr("Duplex"), duplex, source);
+            QString autoneg = ethernetValue(ethernet.autoneg);
+            if (ethernet.autoneg.state == ReadState::Available) {
+                if (ethernet.autoneg.value == "0") autoneg = tr("Disabled");
+                else if (ethernet.autoneg.value == "1") autoneg = tr("Enabled");
+                else autoneg = tr("Unrecognized autonegotiation value: %1").arg(ethernet.autoneg.value);
+            }
+            field(form, tr("Autonegotiation"), autoneg, source);
+            field(form, tr("Supported modes / capabilities"), ethernetValue(ethernet.supportedModes).replace('\n', ", "),
+                source + '\n' + tr("Kernel-named supported-mask entries include link modes and media, pause or autonegotiation capabilities. Unnamed bits retain their numeric index."));
+            QString partner = operationalValue(ethernet.partnerModes);
+            if (ethernet.partnerModes.state == ReadState::NotApplicable && !disconnected)
+                partner = tr("Not applicable — autonegotiation disabled");
+            else if (ethernet.partnerModes.state == ReadState::Unavailable)
+                partner = tr("Unavailable — no partner advertisement reported");
+            field(form, tr("Link-partner advertised modes"), partner.replace('\n', ", "), source);
+        }
         auto *link = group(tr("%1 — Link").arg(interface.name));
         const bool noMac = interface.linkType.state == ReadState::Available && interface.linkType.value != "1";
         const Attribute current = noMac ? Attribute {ReadState::NotApplicable, {}, 0} : interface.currentAddress;
@@ -653,6 +709,8 @@ void PropertiesDialog::rebuildNetwork()
         field(link, tr("Overridden MAC address"), overrideValue,
             interface.path + "/address; " + interface.path + "/addr_assign_type; ETHTOOL_GPERMADDR");
         field(link, tr("MTU"), propertyReadValue(interface.mtu), interface.path + "/mtu");
+        if (!ethernet.applicable && ethernet.scope.state != ReadState::NotApplicable)
+            field(link, tr("Ethernet details"), ethernetValue(ethernet.scope), ethernet.source);
         auto *addresses = group(tr("%1 — IP addresses").arg(interface.name));
         const QString source = tr("getifaddrs: application network namespace");
         if (interface.addresses.isEmpty()) {

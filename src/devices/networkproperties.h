@@ -1,6 +1,7 @@
 #pragma once
 
 #include "device.h"
+#include "ethernetproperties.h"
 
 struct NetworkAddress {
     QString family;
@@ -19,6 +20,7 @@ struct NetworkProperties {
     QVector<NetworkAddress> addresses;
     Attribute addressState;
     Attribute permanentAddress;
+    EthernetProperties ethernet;
 };
 
 NetworkProperties collectNetworkProperties(const QString &name, unsigned int index, bool ethernet);

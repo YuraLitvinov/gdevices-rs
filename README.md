@@ -131,7 +131,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | --- | --- |
 | General | Name, category, manufacturer, bus/subsystem, location, observed status and selected hardware identifiers |
 | Driver | Direct driver binding, owning module, available running version and optional installed-module metadata |
-| Network | All assigned IPv4/IPv6 addresses and masks, permanent/current/overridden MAC addresses and MTU, per interface |
+| Network | IPv4/IPv6 addresses and masks, MAC addresses, MTU, and Ethernet link speed, duplex, autonegotiation and modes |
 | Display | Desktop-session mode resolution, desktop color depth, nominal refresh rate, rotation/reflection and output scale |
 | PCIe | Current link speed/width, reported device maximum speed/width, and connection type when running as root |
 | Battery | Reported capacities, estimated retention, cycle count, chemistry, voltage, percentage, status, current and power |
@@ -226,6 +226,32 @@ address, or Linux reports a random, inherited or explicitly set address. If neit
 source establishes an override, its status remains unavailable. Non-Ethernet
 interfaces show MAC fields as not applicable. Opening or reloading this tab only
 reads configuration; it does not change addresses, MTU or interface state.
+
+For Ethernet-style interfaces without kernel wireless markers, Network adds an
+**Ethernet link** section with carrier state, operational speed, duplex,
+autonegotiation, supported link modes/capabilities and link-partner advertised
+modes. Wi-Fi shares Ethernet-style MAC framing but is excluded using its
+`phy80211` and `wireless` sysfs markers; failed classification reads are shown
+explicitly rather than treated as proof of Ethernet. Virtual Ethernet interfaces
+may provide some fields or report the queries as unsupported; the section does
+not establish a physical cable or port. Interfaces remain separately attributed
+by their exact ifindex in the application's network namespace.
+
+Collection uses native, read-only ethtool generic-netlink `LINKSTATE_GET` and
+`LINKMODES_GET` requests, with a shared two-second reply-wait budget per interface
+and cancellation checks at most every 50 ms during waits. Replies are limited to
+64 KiB, mode bitsets to 4096 entries, and names to 127 bytes; malformed, oversized,
+timed-out, unsupported and permission-denied replies remain explicit. No ethtool
+executable, new library dependency, setting changes, cable tests, notification
+subscriptions or background polling are added. These queries run only for explicit
+Properties snapshots, not deep search. Kernel-provided mode names are preserved,
+including capabilities such as pause or media type; unnamed bits retain their
+index. Empty/missing partner advertisements stay unavailable. Carrier is checked
+again after settings collection; detected changes or interface replacement discard
+the Ethernet snapshot. A disconnected link has speed/duplex/partner modes marked
+not applicable while supported capabilities and autonegotiation can remain visible.
+Forced links do not claim a partner advertisement, and unknown speed never becomes
+zero Mbps. Use **Reload properties** and the existing network copy button.
 
 Installed module descriptions, filenames, licenses and versions require optional
 libkmod support. Installed metadata can differ from code already loaded into the

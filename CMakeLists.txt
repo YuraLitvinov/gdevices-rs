@@ -36,6 +36,7 @@ add_executable(qlinuxdevicemanager
     src/devices/deviceevents.h src/devices/deviceevents.cpp
     src/devices/deviceproperties.h src/devices/deviceproperties.cpp
     src/devices/networkproperties.h src/devices/networkproperties.cpp
+    src/devices/ethernetproperties.h src/devices/ethernetproperties.cpp
     src/devices/displayproperties.h src/devices/displayproperties.cpp
     src/devices/displaybackend.h src/devices/displayx11.cpp src/devices/displaywayland.cpp
     src/devices/storageproperties.h src/devices/storageproperties.cpp
@@ -152,6 +153,7 @@ if(BUILD_TESTING)
         src/devices/devicesearch.cpp src/devices/devicesearch.h
         src/devices/deviceproperties.cpp src/devices/deviceproperties.h
         src/devices/networkproperties.cpp src/devices/networkproperties.h
+        src/devices/ethernetproperties.cpp src/devices/ethernetproperties.h
         src/devices/displayproperties.cpp src/devices/displayproperties.h
         src/devices/displaybackend.h src/devices/displayx11.cpp src/devices/displaywayland.cpp
         src/devices/storageproperties.cpp src/devices/storageproperties.h
