@@ -1,4 +1,9 @@
 #include "mainwindow.h"
+#include "cameraproperties.h"
+#include <cstring>
+#include <cstdlib>
+#include <climits>
+#include <cerrno>
 #include "projectmetadata.h"
 #include <QApplication>
 #include <QIcon>
@@ -11,6 +16,14 @@
 
 int main(int argc, char **argv)
 {
+    // Private hardware-query child: no GUI, settings, session access or capture.
+    if (argc == 5 && std::strcmp(argv[1], "--camera-query") == 0) {
+        char *end = nullptr;
+        errno = 0;
+        const long directory = std::strtol(argv[4], &end, 10);
+        if (errno || end == argv[4] || !end || *end || directory < 0 || directory > INT_MAX) return 1;
+        return runCameraQueryHelper(static_cast<int>(directory), QString::fromLocal8Bit(argv[2]), QString::fromLocal8Bit(argv[3]));
+    }
     // Never write root settings into the sudo caller's XDG directories.
     // This does not modify display/session authorization.
     if (geteuid() == 0) {

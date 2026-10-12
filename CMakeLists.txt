@@ -21,6 +21,7 @@ if(UDISKS2)
 endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(UDEV REQUIRED IMPORTED_TARGET libudev)
+pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
 # Headers only: session libraries are opened on demand with QLibrary (dlopen).
 # Do not link PkgConfig targets for these backends into the executable.
 pkg_check_modules(DISPLAY_X11 REQUIRED xcb-randr)
@@ -43,6 +44,7 @@ add_executable(qlinuxdevicemanager
     src/devices/ethernetproperties.h src/devices/ethernetproperties.cpp
     src/devices/displayproperties.h src/devices/displayproperties.cpp
     src/devices/monitorproperties.h src/devices/monitorproperties.cpp
+    src/devices/cameraproperties.h src/devices/cameraproperties.cpp
     src/devices/displaybackend.h src/devices/displayx11.cpp src/devices/displaywayland.cpp
     src/devices/storageproperties.h src/devices/storageproperties.cpp
     src/devices/directoryscan.h
@@ -80,7 +82,7 @@ qt_add_resources(qlinuxdevicemanager app_icons
 target_include_directories(qlinuxdevicemanager PRIVATE
     src/devices src/ui "${CMAKE_CURRENT_BINARY_DIR}/generated"
     ${DISPLAY_X11_INCLUDE_DIRS} ${DISPLAY_WAYLAND_INCLUDE_DIRS})
-target_link_libraries(qlinuxdevicemanager PRIVATE Qt6::Widgets Qt6::Network PkgConfig::UDEV)
+target_link_libraries(qlinuxdevicemanager PRIVATE Qt6::Widgets Qt6::Network PkgConfig::UDEV PkgConfig::V4L2)
 if(DISPLAY_INFO AND TARGET PkgConfig::DISPLAY_INFO)
     target_link_libraries(qlinuxdevicemanager PRIVATE PkgConfig::DISPLAY_INFO)
     target_compile_definitions(qlinuxdevicemanager PRIVATE QLDM_HAVE_DISPLAY_INFO)
@@ -168,6 +170,7 @@ if(BUILD_TESTING)
         src/devices/ethernetproperties.cpp src/devices/ethernetproperties.h
         src/devices/displayproperties.cpp src/devices/displayproperties.h
         src/devices/monitorproperties.cpp src/devices/monitorproperties.h
+        src/devices/cameraproperties.cpp src/devices/cameraproperties.h
         src/devices/displaybackend.h src/devices/displayx11.cpp src/devices/displaywayland.cpp
         src/devices/storageproperties.cpp src/devices/storageproperties.h
         src/devices/storagepresentation.cpp src/devices/storagepresentation.h
@@ -182,7 +185,7 @@ if(BUILD_TESTING)
         src/ui/devicefilter.cpp src/ui/devicefilter.h)
     target_include_directories(device-search-test PRIVATE src/devices src/ui
         ${DISPLAY_X11_INCLUDE_DIRS} ${DISPLAY_WAYLAND_INCLUDE_DIRS})
-    target_link_libraries(device-search-test PRIVATE Qt6::Widgets PkgConfig::UDEV)
+    target_link_libraries(device-search-test PRIVATE Qt6::Widgets PkgConfig::UDEV PkgConfig::V4L2)
     if(DISPLAY_INFO AND TARGET PkgConfig::DISPLAY_INFO)
         target_link_libraries(device-search-test PRIVATE PkgConfig::DISPLAY_INFO)
         target_compile_definitions(device-search-test PRIVATE QLDM_HAVE_DISPLAY_INFO)

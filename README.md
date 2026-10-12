@@ -328,6 +328,45 @@ outputs without a mode retain **No active mode**. Zero rotation is shown as
 **0°**; nonzero angles retain their counterclockwise direction.
 Use **Reload properties** to refresh the monitor and desktop configuration snapshot.
 
+The **Camera** tab appears on V4L2 image-capture nodes. Driver/card/bus
+information uses grouped fields; a mode table keeps capture queue, pixel format,
+resolution and frame intervals together. Single-plane and multi-plane capture
+are kept separate. Metadata-only, radio/output and memory-to-memory codec nodes
+are excluded after capability detection; if access fails, a video node retains
+the tab to explain the permission, busy, removed or unsupported query state.
+The tab describes capture-node capabilities, not necessarily a physical camera.
+
+The properties worker invokes a private headless mode of the same executable,
+using **libv4l2** to pass native `VIDIOC_QUERYCAP`, `VIDIOC_ENUM_FMT`,
+`VIDIOC_ENUM_FRAMESIZES` and `VIDIOC_ENUM_FRAMEINTERVALS` queries to the driver.
+The device is opened read-only/nonblocking. It is not registered for libv4l's
+conversion/streaming setup, so converted formats are not added by the library.
+No controls, formats, frame rates, buffers or streaming state are changed; no
+frames are read. Opening a device can still wake hardware through its driver.
+
+The helper is isolated because nonblocking opens do not give arbitrary driver
+ioctls a timeout. The worker waits at most two seconds for its reply, checking
+cancellation every 25 ms; it kills the helper on timeout/cancellation and never
+blocks waiting for it to exit. A driver stuck in uninterruptible kernel sleep
+may delay exit: only one unreaped helper is allowed, and later camera requests
+retry reaping it rather than accumulating processes. This is on-demand collection,
+with no background hardware polling. Queries are bounded to 4096 ioctls, 128
+formats per queue, 128 sizes per format, 128 intervals per discrete size, 2048
+mode rows and a 1 MiB reply. Limits and partial enumeration are explicit.
+
+Each discrete size gets its own frame-interval query. Continuous/stepwise size
+ranges remain ranges: frame intervals are marked size-dependent and are not
+sampled or assigned to every size. Interval ranges retain their rational seconds
+and interval step, rather than inventing a uniform frame-rate step. Discrete
+rates are calculated as the reciprocal of the reported interval and retain the
+exact rational interval. Missing/unsupported enumeration never becomes zero fps.
+These are driver reports for the current media pipeline, not measured capture
+rates or guarantees of simultaneous-stream throughput. Device-node major/minor,
+connector directory identity and `/sys/dev/char` ownership are checked before
+and after querying; a replaced/removed node discards the report. **Reload properties**
+and **Copy camera properties** use the same owned snapshot, including headings
+and labels for every mode. Capability queries are excluded from deep search.
+
 The **USB** tab appears only on USB device nodes (including hubs), with grouped
 label/value sections and a copy button. Its first **Connection** section shows the
 reported USB specification version and kernel-reported connection speed in Mbps
@@ -470,6 +509,7 @@ Requirements:
 - CMake **3.19 or newer** and pkg-config.
 - Qt **6.8 or newer**, including Widgets and Network, and libudev development headers.
   Qt Network is used locally to decode MOK certificates; this feature makes no network requests.
+- libv4l2 development headers/library (Fedora: **libv4l-devel**; Debian/Ubuntu: **libv4l-dev**).
 - XCB RandR and Wayland client **1.20 or newer** development headers (runtime
   libraries are required only for the corresponding Display backend).
 - Optional QtDBus **6.8 or newer** for cached UDisks2 storage metadata.
@@ -481,7 +521,7 @@ Fedora packages:
 
 ```sh
 # Optional monitor EDID decoding: libdisplay-info-devel
-sudo dnf install gcc-c++ cmake make pkgconf-pkg-config qt6-qtbase-devel systemd-devel libxcb-devel wayland-devel
+sudo dnf install gcc-c++ cmake make pkgconf-pkg-config qt6-qtbase-devel systemd-devel libv4l-devel libxcb-devel wayland-devel
 # Optional:
 sudo dnf install qt6-qttools-devel kmod-devel libdisplay-info-devel
 ```
@@ -490,7 +530,7 @@ Debian/Ubuntu packages:
 
 ```sh
 # Optional monitor EDID decoding: libdisplay-info-dev (>= 0.1.1)
-sudo apt install g++ cmake make pkg-config qt6-base-dev libudev-dev libxcb-randr0-dev libwayland-dev
+sudo apt install g++ cmake make pkg-config qt6-base-dev libudev-dev libv4l-dev libxcb-randr0-dev libwayland-dev
 # Optional:
 sudo apt install qt6-tools-dev qt6-tools-dev-tools libkmod-dev libdisplay-info-dev
 ```

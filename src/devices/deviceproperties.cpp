@@ -593,6 +593,9 @@ DeviceProperties collectDeviceProperties(const Device &device, bool cachedStorag
             usbProperties(result, deviceFd.fd);
         if (cachedStorageService && !QThread::currentThread()->isInterruptionRequested())
             batteryProperties(result, deviceFd.fd);
+        if (cachedStorageService && d.subsystem == "video4linux" && d.sysname.startsWith("video")
+            && !QThread::currentThread()->isInterruptionRequested())
+            result.camera = collectCameraProperties(deviceFd.fd, d, boundedText(udev_device_get_devnode(raw.get())).value);
         // Desktop-session queries belong to explicit properties requests, not
         // deep search (which passes cachedStorageService=false).
         if (cachedStorageService && d.subsystem == "drm" && d.sysname.contains('-')
