@@ -18,6 +18,7 @@
 #include <QVector>
 #include <utility>
 #include <limits>
+#include <algorithm>
 
 namespace {
 QVector<QPair<QString, QString>> memoryFields()
@@ -92,6 +93,7 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(os, "boot", tr("Boot mode"));
     field(os, "virtualization", tr("Virtualization environment"));
     field(os, "uptime", tr("Uptime"));
+    field(os, "gpu_rebar", tr("Resizable BAR (GPU)"));
     auto *secureBoot = group(tr("Secure Boot"));
     field(secureBoot, "secure_boot", tr("Status"));
     captions_.insert("secure_boot", tr("Secure Boot"));
@@ -166,6 +168,45 @@ QString SystemDialog::displayValue(const QString &key, const Attribute &value) c
                 lines.append(field.second + ": " + memoryValue(field.first, device.values.value(field.first)));
         }
         return lines.join('\n');
+    }
+    if (key == "gpu_rebar") {
+        if (snapshot_.gpuRebarStatus.state != ReadState::Available)
+            return propertyReadValue(snapshot_.gpuRebarStatus);
+        if (snapshot_.gpuRebar.isEmpty()) return tr("No PCI display controller reported");
+        const auto size = [this](const Attribute &value) {
+            if (value.state != ReadState::Available) return propertyReadValue(value);
+            const qulonglong bytes = value.value.toULongLong();
+            if (bytes <= static_cast<qulonglong>(std::numeric_limits<qlonglong>::max()))
+                return QLocale().formattedDataSize(static_cast<qlonglong>(bytes), 0, QLocale::DataSizeIecFormat);
+            return tr("%1 bytes").arg(QLocale().toString(bytes));
+        };
+        QStringList devices;
+        for (const GpuResizableBar &gpu : snapshot_.gpuRebar) {
+            QStringList lines {tr("GPU [%1]").arg(gpu.pciAddress)};
+            if (gpu.status.state == ReadState::Unavailable) lines.append(tr("Capability: Not exposed by kernel"));
+            else if (gpu.status.state != ReadState::Available) lines.append(propertyReadValue(gpu.status));
+            else {
+                lines.append(tr("Capability: Supported"));
+                QList<int> bars = gpu.supportedSizes.keys();
+                std::sort(bars.begin(), bars.end());
+                for (int bar : bars) {
+                    const Attribute bitmap = gpu.supportedSizes.value(bar);
+                    QString supported = propertyReadValue(bitmap);
+                    if (bitmap.state == ReadState::Available) {
+                        const qulonglong bits = bitmap.value.toULongLong(nullptr, 16);
+                        QStringList sizes;
+                        for (int bit = 0; bit < 44; ++bit)
+                            if (bits & (1ULL << bit)) sizes.append(size({ReadState::Available, QString::number(1ULL << (bit + 20)), 0}));
+                        supported = sizes.join(", ");
+                    }
+                    lines.append(tr("BAR %1 — Current allocation: %2; supported sizes: %3")
+                        .arg(bar).arg(size(gpu.currentSizes.value(bar)), supported));
+                }
+            }
+            lines.append(tr("BIOS setting: Unknown"));
+            devices.append(lines.join('\n'));
+        }
+        return devices.join("\n\n");
     }
     if (key == "mok") {
         const MokCertificates &mok = snapshot_.mok;
@@ -374,6 +415,10 @@ void SystemDialog::acceptResult(SystemProperties result)
         QString source = snapshot_.sources.value(key);
         if (key == "secure_boot")
             source += '\n' + tr("Firmware SecureBoot state; does not establish shim validation or kernel lockdown policy.");
+        if (key == "gpu_rebar")
+            source += '\n' + tr("GPU capability and current OS resource allocation are separate from the firmware setting. "
+                "A small BAR is not proof of disabled ReBAR; a large BAR is not proof of driver use. "
+                "No portable BIOS Enabled/Disabled value is inferred. Only sysfs metadata is read; BAR memory is never accessed.");
         if (key == "instruction_sets")
             source += '\n' + tr("Kernel-exposed instruction-set and CPU-feature flags for processors listed in /proc/cpuinfo. "
                 "These include non-instruction features and may be limited by the kernel, operating system or hypervisor. "

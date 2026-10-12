@@ -44,6 +44,27 @@ int main(int argc, char **argv)
           "Global board fields are not assigned to a processor");
     check(parseCpuInstructionSets(QString(4 * 1024 * 1024 + 1, 'x')).error == EOVERFLOW,
           "CPU feature parser input is bounded");
+    check(parseResizableBarSizes("00000000000001c0").value == "1c0",
+          "Resizable BAR bitmap preserves supported 64/128/256 MiB sizes");
+    check(parseResizableBarSizes("100").value == "100", "Single supported 256 MiB size is valid capability evidence");
+    check(parseResizableBarSizes("0").error == EINVAL && parseResizableBarSizes("wrong").error == EINVAL,
+          "Empty or malformed supported-size masks are explicit errors");
+    check(parseResizableBarSizes("100000000000").error == EOVERFLOW,
+          "Unsupported size arithmetic never shifts beyond 64 bits");
+    check(parseResizableBarAllocation("0000009800000000 000000980fffffff 000000000014220c", 0).value == "268435456",
+          "Allocated GPU memory aperture uses inclusive resource range, not an enabled heuristic");
+    check(parseResizableBarAllocation("0 0 200", 0).state == ReadState::Unavailable,
+          "Masked or empty addresses never become a one-byte BAR");
+    check(parseResizableBarAllocation("0 ffffffff 20000200", 0).state == ReadState::Unavailable,
+          "Unassigned resources do not establish a current aperture");
+    check(parseResizableBarAllocation("100 1ff 100", 0).state == ReadState::Unavailable,
+          "I/O resources are not memory apertures");
+    check(parseResizableBarAllocation("200 100 200", 0).error == EINVAL
+          && parseResizableBarAllocation("garbage", 0).error == EINVAL,
+          "Malformed and reversed allocations remain explicit errors");
+    check(parseResizableBarAllocation("0 ffffffffffffffff 200", 0).error == EOVERFLOW,
+          "Inclusive full-address-space size cannot overflow");
+    check(parseResizableBarAllocation("0 0 0", 6).error == EINVAL, "Only the six PCI BAR resource slots are parsed");
     QHash<QString, QString> memory {
         {"MEMORY_ARRAY_NUM_DEVICES", "2"},
         {"MEMORY_DEVICE_0_SIZE", "17179869184"},

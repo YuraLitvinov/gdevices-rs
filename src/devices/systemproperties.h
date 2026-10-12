@@ -13,7 +13,16 @@ struct FirmwareMemoryInformation {
     QVector<FirmwareMemoryDevice> devices;
 };
 
+struct GpuResizableBar {
+    QString pciAddress;
+    Attribute status; // Available: sysfs exposes capability; Unavailable: not exposed.
+    QHash<int, Attribute> supportedSizes; // Raw validated hexadecimal bitmaps.
+    QHash<int, Attribute> currentSizes; // Allocated aperture size in bytes.
+};
+
 struct SystemProperties {
+    Attribute gpuRebarStatus;
+    QVector<GpuResizableBar> gpuRebar;
     FirmwareMemoryInformation memoryDevices;
     MokCertificates mok;
     QHash<QString, Attribute> values;
@@ -22,6 +31,8 @@ struct SystemProperties {
 
 // Pure parsers shared with fixtures; no commands or shell evaluation.
 Attribute parseCpuInstructionSets(const QString &cpuinfo);
+Attribute parseResizableBarSizes(const QString &text);
+Attribute parseResizableBarAllocation(const QString &resources, int bar);
 Attribute parseOsName(const QString &text);
 FirmwareMemoryInformation parseMemoryDevices(const QHash<QString, QString> &properties);
 Attribute parseInstalledMemory(const QHash<QString, QString> &properties);

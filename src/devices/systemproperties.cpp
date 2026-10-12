@@ -120,6 +120,87 @@ void installedMemory(SystemProperties &result)
     }
     result.memoryDevices = parseMemoryDevices(properties);
 }
+void gpuResizableBar(SystemProperties &result)
+{
+    const QString base = "/sys/bus/pci/devices";
+    const int fd = open(base.toUtf8().constData(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (fd < 0) { result.gpuRebarStatus = failed(errno); return; }
+    close(fd);
+    const DirectoryNames devices = boundedDirectoryNames(base, 4096);
+    if (devices.error) { result.gpuRebarStatus = failed(devices.error); return; }
+    for (const QString &name : devices.names) {
+        if (QThread::currentThread()->isInterruptionRequested()) {
+            result.gpuRebar.clear(); result.gpuRebarStatus = failed(ECANCELED); return;
+        }
+        const QString path = base + '/' + name;
+        struct stat before {};
+        if (stat(path.toUtf8().constData(), &before) != 0) {
+            result.gpuRebar.clear(); result.gpuRebarStatus = failed(errno); return;
+        }
+        const Attribute cls = readText(path + "/class", 32);
+        bool ok = false;
+        const uint code = cls.value.toUInt(&ok, 16);
+        if (cls.state != ReadState::Available || !ok || code > 0xffffff) {
+            result.gpuRebar.clear(); result.gpuRebarStatus = cls.state == ReadState::Available ? failed(EINVAL) : cls; return;
+        }
+        if (code >> 16 != 0x03) continue; // PCI display controllers only; no GPU-ID database.
+        if (result.gpuRebar.size() >= 64) {
+            result.gpuRebar.clear(); result.gpuRebarStatus = failed(EOVERFLOW); return;
+        }
+        GpuResizableBar gpu;
+        gpu.pciAddress = name;
+        Attribute resources;
+        bool haveCapability = false;
+        for (int bar = 0; bar < 6; ++bar) {
+            const QString bitmapPath = path + QStringLiteral("/resource%1_resize").arg(bar);
+            struct stat attribute {};
+            if (stat(bitmapPath.toUtf8().constData(), &attribute) != 0) {
+                if (errno == ENOENT) continue;
+                gpu.status = failed(errno);
+                break;
+            }
+            const Attribute bitmap = readText(bitmapPath, 32);
+            haveCapability = true; // Existing sysfs attribute is positive evidence, even if unreadable.
+            gpu.supportedSizes[bar] = bitmap.state == ReadState::Available ? parseResizableBarSizes(bitmap.value)
+                : bitmap.state == ReadState::Unavailable ? failed(ENODATA) : bitmap;
+            if (resources.state == ReadState::Unavailable && resources.error == 0)
+                resources = readText(path + "/resource", 65536);
+            gpu.currentSizes[bar] = resources.state == ReadState::Available
+                ? parseResizableBarAllocation(resources.value, bar) : resources;
+        }
+        if (gpu.status.state == ReadState::Unavailable && gpu.status.error == 0)
+            gpu.status = haveCapability ? available("reported") : Attribute();
+        // Catch removal/replacement or allocation changes observed during collection.
+        struct stat after {};
+        const bool same = stat(path.toUtf8().constData(), &after) == 0
+            && before.st_dev == after.st_dev && before.st_ino == after.st_ino;
+        bool stable = same;
+        if (stable && haveCapability) {
+            const Attribute finalResources = readText(path + "/resource", 65536);
+            stable = resources.state == finalResources.state && resources.error == finalResources.error
+                && resources.value == finalResources.value;
+        }
+        if (stable && haveCapability) {
+            for (auto it = gpu.supportedSizes.cbegin(); it != gpu.supportedSizes.cend(); ++it) {
+                Attribute bitmap = readText(path + QStringLiteral("/resource%1_resize").arg(it.key()), 32);
+                if (bitmap.state == ReadState::Available) bitmap = parseResizableBarSizes(bitmap.value);
+                else if (bitmap.state == ReadState::Unavailable && bitmap.error == 0) bitmap = failed(ENODATA);
+                if (bitmap.state != it.value().state || bitmap.error != it.value().error || bitmap.value != it.value().value)
+                    stable = false;
+            }
+        }
+        if (!stable) {
+            gpu.status = failed(EAGAIN);
+            gpu.supportedSizes.clear(); gpu.currentSizes.clear();
+        }
+        result.gpuRebar.append(std::move(gpu));
+    }
+    const DirectoryNames after = boundedDirectoryNames(base, 4096);
+    if (after.error || after.names != devices.names) {
+        result.gpuRebar.clear(); result.gpuRebarStatus = failed(after.error ? after.error : EAGAIN); return;
+    }
+    result.gpuRebarStatus = available(QString::number(result.gpuRebar.size()));
+}
 void cpuTopology(SystemProperties &result)
 {
     const QString base = "/sys/devices/system/cpu";
@@ -237,6 +318,44 @@ void cpuTopology(SystemProperties &result)
 }
 }
 
+Attribute parseResizableBarSizes(const QString &text)
+{
+    if (text.isEmpty() || text.size() > 16) return failed(EINVAL);
+    for (QChar c : text)
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) return failed(EINVAL);
+    bool ok = false;
+    const qulonglong bitmap = text.toULongLong(&ok, 16);
+    if (!ok || !bitmap) return failed(EINVAL);
+    // bit n means 2^(n+20) bytes. Do not shift beyond a 64-bit size.
+    if (bitmap >> 44) return failed(EOVERFLOW);
+    return available(QString::number(bitmap, 16));
+}
+Attribute parseResizableBarAllocation(const QString &resources, int bar)
+{
+    if (bar < 0 || bar >= 6 || resources.size() > 65536) return failed(EINVAL);
+    const QStringList lines = resources.split('\n');
+    if (bar >= lines.size()) return failed(EINVAL);
+    const QStringList fields = lines[bar].simplified().split(' ');
+    if (fields.size() != 3) return failed(EINVAL);
+    qulonglong values[3] {};
+    for (int i = 0; i < 3; ++i) {
+        QString text = fields[i];
+        if (text.startsWith("0x", Qt::CaseInsensitive)) text.remove(0, 2);
+        if (text.isEmpty() || text.size() > 16) return failed(EINVAL);
+        for (QChar c : text)
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) return failed(EINVAL);
+        bool ok = false;
+        values[i] = text.toULongLong(&ok, 16);
+        if (!ok) return failed(EINVAL);
+    }
+    const qulonglong start = values[0], end = values[1], flags = values[2];
+    if ((flags & 0x1f00) != 0x200) return {}; // No reported memory resource.
+    if (flags & 0x30000000) return {}; // Unassigned or disabled resource, not a BIOS ReBAR verdict.
+    if (start == 0 && end == 0) return {}; // Empty/masked addresses never mean a one-byte BAR.
+    if (end < start) return failed(EINVAL);
+    if (end - start == std::numeric_limits<qulonglong>::max()) return failed(EOVERFLOW);
+    return available(QString::number(end - start + 1));
+}
 Attribute parseCpuInstructionSets(const QString &cpuinfo)
 {
     // Reuse the bounded /proc/cpuinfo snapshot, never claim a union of features
@@ -453,6 +572,8 @@ SystemProperties collectSystemProperties()
     put("cpu", cpu.state == ReadState::Available ? models.isEmpty() ? Attribute() : available(models.join('\n')) : cpu, "/proc/cpuinfo: per-processor model fields");
     put("instruction_sets", cpu.state == ReadState::Available ? parseCpuInstructionSets(cpu.value) : cpu,
         "/proc/cpuinfo: per-processor flags, Features or isa; kernel-exposed instruction sets and CPU features");
+    gpuResizableBar(result);
+    result.sources["gpu_rebar"] = "/sys/bus/pci/devices: display-controller class, resourceN_resize supported-size bitmaps, resource allocation metadata; BIOS setting is not exposed";
     cpuTopology(result);
     installedMemory(result);
     result.sources["physical_memory"] = "libudev: dmi/id MEMORY_ARRAY_NUM_DEVICES and MEMORY_DEVICE_n_SIZE/PRESENT; firmware-reported installed RAM";

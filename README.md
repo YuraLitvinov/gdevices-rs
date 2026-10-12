@@ -430,6 +430,21 @@ boot-mode evidence and reported hypervisor identity. Its existing sections are
 presented as scrollable tabs: **System**, **Secure Boot**, **Hardware and firmware**,
 **Processor**, and **RAM/Memory**. Refresh and Copy all cover every tab.
 
+The **System** tab includes **Resizable BAR (GPU)** for PCI display controllers.
+It separates kernel-exposed capability (**Supported** or **Not exposed by kernel**),
+current allocated BAR aperture sizes, supported sizes and the **BIOS setting**.
+The BIOS setting is shown as **Unknown**: the generic sysfs interfaces do not
+provide a portable firmware Enabled/Disabled value. GPU support alone does not
+prove firmware enablement. A 256 MiB BAR is not treated as disabled, and a large
+allocation does not establish that the graphics driver uses the full aperture.
+Missing interfaces do not establish that the hardware or BIOS lacks support.
+
+Collection reads only `class`, `resourceN_resize` and `resource` metadata in the
+system-information worker, with bounded PCI/GPU enumeration, cancellation and
+observed replacement/allocation-change checks. No configuration changes, resizing,
+BAR memory access or privileged helper is used. Permission failures remain explicit;
+the current allocation can still be shown when supported-size reads are restricted.
+
 The Processor tab also shows instruction-set and CPU-feature declarations from
 per-processor `flags`, `Features` or `isa` in the existing `/proc/cpuinfo` snapshot.
 Kernel tokens are preserved and identical lists are grouped. Different reported
