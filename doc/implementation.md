@@ -384,6 +384,28 @@ is not a guarantee of health. Opening or reloading Properties never requests SMA
 updates, background polling or self-tests. UDisks2 may update its own cache
 independently.
 
+For NVMe controllers with a valid health-cache timestamp, the Health tab also
+shows cached power-on hours and calls `SmartGetAttributes` for spare capacity,
+spare threshold, estimated endurance used, total bytes read/written, controller
+busy time, power cycles, unsafe shutdowns, media/data-integrity errors, error-log
+entry count, temperature sensors, temperature thresholds and time above them.
+The method returns UDisks2's stored log; it does not request a SMART update.
+Detailed-cache calls share a 2.5-second wait budget across related controllers,
+with cancellation checks every 50 ms, no service activation or interactive
+authorization, and accepted replies limited to 64 dictionary entries and eight
+sensors. Missing keys, invalid D-Bus types, unsupported methods, permission
+failures and timeouts stay explicit; the basic cached health fields remain usable.
+
+Counters and percentages preserve zero. Estimated endurance used can exceed
+100%; it is a vendor estimate, not a failure verdict. Zero sensor/threshold
+values and zero power-on hours are unavailable under the API. Temperatures use
+the existing Kelvin-to-Celsius conversion, so integer-Kelvin reports can differ
+slightly from smartctl's rounded display. Data read/written are UDisks2 byte
+estimates, not raw NVMe data-unit counters. Counts summarize error-log entries;
+individual error records, past self-test logs and thermal transition counters
+are not exposed by this collection. Health data is controller-wide and is not
+attributed as namespace-specific measurements.
+
 ## System information
 
 The system overview shows hostname, operating system, kernel architecture/release/

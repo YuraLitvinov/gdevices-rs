@@ -60,6 +60,19 @@ QString storageFieldValue(const StorageField &field)
         const double kelvin = value.value.toDouble(&valid);
         return valid && kelvin > 0 ? QCoreApplication::translate("Storage", "%1 °C (cached)").arg(QLocale().toString(kelvin - 273.15, 'f', 1)) : QCoreApplication::translate("Storage", "Unavailable");
     }
+    case Format::Percent:
+    case Format::Hours:
+    case Format::Minutes:
+    case Format::Count: {
+        bool valid = false;
+        const quint64 number = value.value.toULongLong(&valid);
+        if (!valid) return QCoreApplication::translate("Storage", "Invalid health metadata");
+        const QString text = QLocale().toString(number);
+        if (field.format == Format::Percent) return QCoreApplication::translate("Storage", "%1%").arg(text);
+        if (field.format == Format::Hours) return QCoreApplication::translate("Storage", "%1 hours").arg(text);
+        if (field.format == Format::Minutes) return QCoreApplication::translate("Storage", "%1 minutes").arg(text);
+        return text;
+    }
     case Format::AtaHealth: return value.value == "1" ? QCoreApplication::translate("Storage", "Failure predicted by drive (cached)")
         : value.value == "0" ? QCoreApplication::translate("Storage", "No failure predicted by drive (cached; not a guarantee of health)") : QCoreApplication::translate("Storage", "Unavailable");
     case Format::NvmeHealth: return value.value.isEmpty() ? QCoreApplication::translate("Storage", "No critical warnings reported (cached; not a guarantee of health)") : value.value;

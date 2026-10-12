@@ -25,6 +25,7 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QEventLoop>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QVariant>
 #include <sys/sysmacros.h>
@@ -152,6 +153,109 @@ void serviceField(StorageEntity &entity, const QVariantMap &properties, const QS
     field(entity.fields, interface + '/' + QLatin1String(key), label, data,
           entity.id + " : " + interface + '.' + QLatin1String(key), format);
 }
+// Cache-only method: UDisks2 returns its stored log, without SmartUpdate or tests.
+void nvmeAttributes(StorageEntity &entity, QElapsedTimer &budget)
+{
+    const QString iface = QStringLiteral("org.freedesktop.UDisks2.NVMe.Controller");
+    const QString source = entity.id + " : " + iface + ".SmartGetAttributes";
+    const auto note = [&](const Attribute &state) {
+        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached NVMe health details"), state, source);
+    };
+    const int remaining = 2500 - static_cast<int>(budget.elapsed());
+    if (QThread::currentThread()->isInterruptionRequested()) { note(failure(ECANCELED)); return; }
+    if (remaining <= 0) { note(failure(ETIMEDOUT)); return; }
+    auto message = QDBusMessage::createMethodCall("org.freedesktop.UDisks2", entity.id, iface, "SmartGetAttributes");
+    message.setAutoStartService(false);
+    message.setInteractiveAuthorizationAllowed(false);
+    message << QVariant::fromValue(QVariantMap());
+    QDBusPendingCallWatcher watcher(QDBusConnection::systemBus().asyncCall(message, remaining));
+    QEventLoop loop;
+    QTimer cancellation;
+    cancellation.setInterval(50);
+    QObject::connect(&watcher, &QDBusPendingCallWatcher::finished, &loop, &QEventLoop::quit);
+    QObject::connect(&cancellation, &QTimer::timeout, &loop, [&] {
+        if (QThread::currentThread()->isInterruptionRequested() || budget.elapsed() >= 2500) loop.quit();
+    });
+    cancellation.start();
+    if (!watcher.isFinished()) loop.exec();
+    if (QThread::currentThread()->isInterruptionRequested()) { note(failure(ECANCELED)); return; }
+    if (!watcher.isFinished()) { note(failure(ETIMEDOUT)); return; }
+    QDBusPendingReply<QVariantMap> reply = watcher;
+    if (reply.isError()) {
+        const QDBusError error = reply.error();
+        const ReadState state = error.type() == QDBusError::AccessDenied ? ReadState::PermissionDenied
+            : error.type() == QDBusError::UnknownMethod || error.type() == QDBusError::UnknownInterface ? ReadState::Unsupported
+            : error.type() == QDBusError::ServiceUnknown || error.type() == QDBusError::UnknownObject ? ReadState::Unavailable
+            : ReadState::Error;
+        note({state, {}, error.type() == QDBusError::NoReply || error.type() == QDBusError::Timeout
+            || error.type() == QDBusError::TimedOut ? ETIMEDOUT : EIO});
+        return;
+    }
+    const QVariantMap values = reply.value();
+    if (values.size() > 64) { note(failure(EOVERFLOW)); return; }
+    const auto add = [&](const char *key, const char *label, int type, Format format, bool zeroUnknown = false) {
+        const QVariant value = values.value(QLatin1String(key));
+        Attribute data;
+        if (value.isValid()) {
+            if (value.metaType().id() != type) data = failure(EINVAL);
+            else if (!zeroUnknown || value.toULongLong() != 0) data = ok(QString::number(value.toULongLong()));
+        }
+        field(entity.fields, iface + "/SmartGetAttributes/" + QLatin1String(key), label, data, source + " : " + QLatin1String(key), format);
+    };
+    add("avail_spare", QT_TRANSLATE_NOOP("Storage", "Cached available spare"), QMetaType::UChar, Format::Percent);
+    add("spare_thresh", QT_TRANSLATE_NOOP("Storage", "Cached spare threshold"), QMetaType::UChar, Format::Percent);
+    add("percent_used", QT_TRANSLATE_NOOP("Storage", "Cached estimated endurance used"), QMetaType::UChar, Format::Percent);
+    add("total_data_read", QT_TRANSLATE_NOOP("Storage", "Cached total data read"), QMetaType::ULongLong, Format::Bytes);
+    add("total_data_written", QT_TRANSLATE_NOOP("Storage", "Cached total data written"), QMetaType::ULongLong, Format::Bytes);
+    add("ctrl_busy_time", QT_TRANSLATE_NOOP("Storage", "Cached controller busy time"), QMetaType::ULongLong, Format::Minutes);
+    add("power_cycles", QT_TRANSLATE_NOOP("Storage", "Cached power cycles"), QMetaType::ULongLong, Format::Count);
+    add("unsafe_shutdowns", QT_TRANSLATE_NOOP("Storage", "Cached unsafe shutdowns"), QMetaType::ULongLong, Format::Count);
+    add("media_errors", QT_TRANSLATE_NOOP("Storage", "Cached media and data integrity errors"), QMetaType::ULongLong, Format::Count);
+    add("num_err_log_entries", QT_TRANSLATE_NOOP("Storage", "Cached error information log entries"), QMetaType::ULongLong, Format::Count);
+    add("wctemp", QT_TRANSLATE_NOOP("Storage", "Cached warning temperature threshold"), QMetaType::UShort, Format::Kelvin, true);
+    add("cctemp", QT_TRANSLATE_NOOP("Storage", "Cached critical temperature threshold"), QMetaType::UShort, Format::Kelvin, true);
+    add("warning_temp_time", QT_TRANSLATE_NOOP("Storage", "Cached time above warning temperature"), QMetaType::UInt, Format::Minutes);
+    add("critical_temp_time", QT_TRANSLATE_NOOP("Storage", "Cached time above critical temperature"), QMetaType::UInt, Format::Minutes);
+
+    const QVariant sensors = values.value("temp_sensors");
+    const char *const labels[] = {
+        QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 1"), QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 2"),
+        QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 3"), QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 4"),
+        QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 5"), QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 6"),
+        QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 7"), QT_TRANSLATE_NOOP("Storage", "Cached temperature sensor 8")
+    };
+    // Accept Qt's typed list or a lazy D-Bus argument; decode at most eight items.
+    Attribute sensorState;
+    QVector<quint16> temperatures;
+    if (sensors.isValid()) {
+        if (sensors.metaType().id() == qMetaTypeId<QList<quint16>>()) {
+            temperatures = sensors.value<QList<quint16>>();
+            sensorState = temperatures.size() > 8 ? failure(EOVERFLOW) : ok(QString());
+        } else if (sensors.metaType().id() != qMetaTypeId<QDBusArgument>()) sensorState = failure(EINVAL);
+        else {
+            const QDBusArgument array = sensors.value<QDBusArgument>();
+            if (array.currentSignature() != "aq") sensorState = failure(EINVAL);
+            else {
+                array.beginArray();
+                while (!array.atEnd() && temperatures.size() < 8) {
+                    quint16 kelvin = 0;
+                    array >> kelvin;
+                    temperatures.append(kelvin);
+                }
+                if (!array.atEnd()) sensorState = failure(EOVERFLOW);
+                else sensorState = ok(QString());
+                array.endArray();
+            }
+        }
+    }
+    for (int i = 0; i < 8; ++i) {
+        Attribute data = sensorState.state == ReadState::Available ? Attribute() : sensorState;
+        if (sensorState.state == ReadState::Available && i < temperatures.size() && temperatures.at(i) != 0)
+            data = ok(QString::number(temperatures.at(i)));
+        field(entity.fields, iface + "/SmartGetAttributes/temp_sensors/" + QString::number(i + 1), labels[i], data,
+              source + QStringLiteral(" : temp_sensors[%1]").arg(i), Format::Kelvin);
+    }
+}
 void addService(StorageProperties &result, const QSet<QString> &nativePaths)
 {
     const StorageObjects objects = serviceSnapshot(result);
@@ -191,7 +295,10 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths)
         }
         if (wanted.size() == before) break;
     }
+    QElapsedTimer healthBudget;
+    healthBudget.start(); // Shared by all related NVMe cache-method calls.
     for (auto it = objects.cbegin(); it != objects.cend(); ++it) {
+        if (QThread::currentThread()->isInterruptionRequested()) return;
         if (!wanted.contains(it.key().path())) continue;
         StorageEntity entity;
         entity.id = it.key().path();
@@ -259,7 +366,11 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths)
                                              qMakePair("SmartNumAttributesFailing", QT_TRANSLATE_NOOP("Storage", "Cached failing attributes"))}) {
                         if (health.value(pair.first, -1).toLongLong() >= 0) copy("Drive.Ata", pair.first, pair.second);
                     }
-                } else copy("NVMe.Controller", "SmartCriticalWarning", QT_TRANSLATE_NOOP("Storage", "Cached NVMe critical warnings"), Format::NvmeHealth);
+                } else {
+                    copy("NVMe.Controller", "SmartCriticalWarning", QT_TRANSLATE_NOOP("Storage", "Cached NVMe critical warnings"), Format::NvmeHealth);
+                    copy("NVMe.Controller", "SmartPowerOnHours", QT_TRANSLATE_NOOP("Storage", "Cached power-on time"), Format::Hours, true);
+                    nvmeAttributes(entity, healthBudget);
+                }
             } else {
                 field(entity.fields, "health", QT_TRANSLATE_NOOP("Storage", "Cached health"), {}, entity.id + " : " + prefix + iface + ".SmartUpdated (never updated or unavailable)");
             }

@@ -4,7 +4,7 @@
 
 // Owned metadata only. Relationships are explicit edges, never capacity totals.
 struct StorageField {
-    enum class Format { Text, Bytes, Boolean, Removable, Epoch, Kelvin, AtaHealth, NvmeHealth };
+    enum class Format { Text, Bytes, Boolean, Removable, Epoch, Kelvin, Percent, Hours, Minutes, Count, AtaHealth, NvmeHealth };
     QString id;
     const char *label = nullptr; // Static translatable caption, not device input.
     Attribute value;
