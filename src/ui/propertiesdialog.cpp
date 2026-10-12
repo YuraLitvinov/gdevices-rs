@@ -979,6 +979,12 @@ void PropertiesDialog::rebuildPcie()
         bool valid = false;
         const qulonglong lanes = raw.toULongLong(&valid);
         if (!valid || raw.startsWith('-')) return malformed();
+        // max_link_width exposes PCIE_LNK_WIDTH_UNKNOWN (0xff) verbatim.
+        // It is a kernel sentinel, not a 255-lane capability. Actual PCIe
+        // link width fields are six bits wide.
+        if (key == "max_link_width" && lanes == 255)
+            return tr("Unavailable (kernel reports unknown width: %1)").arg(raw);
+        if (lanes > 63) return malformed();
         if (!lanes) return tr("Unavailable (reported width: %1)").arg(raw);
         return tr("x%1 (%2 lanes)").arg(QString::number(lanes), QLocale().toString(lanes));
     };

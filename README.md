@@ -157,8 +157,10 @@ Ordinary PCI devices with none of these attributes and non-PCI children do not
 get an empty tab or inherit a parent's link information. Current link speed/width
 are separate from the device's reported maximum speed/width. Known rates from
 2.5 through 128 GT/s are annotated as PCIe generations 1 through 7; unfamiliar
-speed strings are preserved. Lane widths use `xN` notation. Unknown speed and a
-reported zero width are unavailable, not a healthy/zero-speed link. Missing fields,
+speed strings are preserved. Lane widths use `xN` notation. Unknown speed, a
+reported zero width and the kernel's unknown maximum-width sentinel (`255`)
+are unavailable, not a healthy/zero-speed link or a 255-lane capability. Other
+widths exceeding the six-bit PCIe width field are malformed. Missing fields,
 unsupported queries, permission failures and malformed values are shown explicitly.
 
 These are kernel-reported link snapshots, not measured throughput. Device maxima
