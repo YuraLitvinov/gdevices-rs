@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <QDateTime>
 #include <QLocale>
+#include <cerrno>
 #include <limits>
 
 QString propertyReadValue(const Attribute &a)
@@ -14,9 +15,18 @@ QString propertyReadValue(const Attribute &a)
     case ReadState::Unavailable: return QCoreApplication::translate("PropertiesDialog", "Unavailable");
     case ReadState::PermissionDenied: return QCoreApplication::translate("PropertiesDialog", "Permission denied");
     case ReadState::Removed: return QCoreApplication::translate("PropertiesDialog", "Device removed");
-    case ReadState::Unsupported: return QCoreApplication::translate("PropertiesDialog", "Unsupported in this build");
+    case ReadState::Unsupported: return QCoreApplication::translate("PropertiesDialog", "Unsupported");
     case ReadState::NotApplicable: return QCoreApplication::translate("PropertiesDialog", "Not applicable");
-    case ReadState::Error: return QCoreApplication::translate("PropertiesDialog", "Read error (errno %1)").arg(a.error);
+    case ReadState::Error:
+        switch (a.error) {
+        case ETIMEDOUT: return QCoreApplication::translate("PropertiesDialog", "Query timed out (errno %1)").arg(a.error);
+        case EOVERFLOW: return QCoreApplication::translate("PropertiesDialog", "Data exceeds supported limits (errno %1)").arg(a.error);
+        case EAGAIN: return QCoreApplication::translate("PropertiesDialog", "Temporarily unavailable; retry the query (errno %1)").arg(a.error);
+        case EINVAL:
+        case EPROTO: return QCoreApplication::translate("PropertiesDialog", "Invalid data or query (errno %1)").arg(a.error);
+        case ECANCELED: return QCoreApplication::translate("PropertiesDialog", "Query cancelled (errno %1)").arg(a.error);
+        default: return QCoreApplication::translate("PropertiesDialog", "Read error (errno %1)").arg(a.error);
+        }
     }
     return {};
 }
@@ -29,6 +39,15 @@ QString detailsPropertyStatus(const PropertyEntry &entry)
 QString storageFieldValue(const StorageField &field)
 {
     const Attribute &value = field.value;
+    if (value.state == ReadState::Unsupported) {
+        if (field.id == "service")
+            return QCoreApplication::translate("Storage", "UDisks2 support is not enabled in this build");
+        if (field.id == "health")
+            return QCoreApplication::translate("Storage", "Drive health is not exposed through a supported UDisks2 interface");
+        if (field.id == "org.freedesktop.UDisks2.Drive.Ata/SmartGetAttributes"
+            || field.id == "org.freedesktop.UDisks2.NVMe.Controller/SmartGetAttributes")
+            return QCoreApplication::translate("Storage", "Detailed health query is not supported by UDisks2");
+    }
     if (value.state != ReadState::Available) return propertyReadValue(value);
     using Format = StorageField::Format;
     switch (field.format) {

@@ -45,6 +45,14 @@ Deep search collects metadata in the background. Its cache is refreshed after
 inventory changes or an F5 refresh. Storage deep search uses native metadata;
 it does not query UDisks2 for every device.
 
+Generic unsupported fields are labelled **Unsupported** without inferring a build
+limitation. Storage reporting distinguishes missing build support, an unavailable
+health interface and an unsupported detailed UDisks2 health query. Common read
+errors explain timeouts, supported limits, temporary unavailability, invalid data
+or queries, and cancellation; errno remains available in the displayed and copied
+text. Other errors retain the generic read-error message and errno. Temporary
+unavailability alone is not treated as proof that a device changed.
+
 Virtual and internal devices are hidden by default to keep the hardware browser
 readable. This includes UEFI variables, partitions, USB interfaces, input and sound endpoints,
 DRM card/render nodes, disconnected and disabled display outputs, and many
