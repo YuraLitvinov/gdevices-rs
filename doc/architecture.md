@@ -1,3 +1,10 @@
+# QLinuxDeviceManager architecture
+
+This document describes inventory ownership, workers, device identity and tree
+projections. See the [README](../README.md) for everyday use and the
+[implementation and build reference](implementation.md) for current property
+collectors, limits, dependencies and installation instructions.
+
 ## Architecture and refresh semantics
 
 - `Device`: owned raw metadata, source attribution, canonical path, actual
@@ -19,8 +26,8 @@
 
 Selection survives refresh only for matching path and local generation. The
 incarnation hint combines sysfs directory device/inode numbers and an optional
-udev initialization timestamp. Phase 4 adds removal evidence and conservative
-identity invalidation after monitor loss, described below. Neither inventory
+udev initialization timestamp. Live monitoring adds removal evidence and
+conservative identity invalidation after monitor loss, described below. Neither inventory
 snapshots nor binding observations are atomic with respect to the kernel.
 
 The worker checks cancellation between devices. A kernel metadata read already
@@ -42,8 +49,11 @@ is hidden. Missing parents or unrelated classes never justify
 suppression. The internal-device toggle reveals every retained record.
 
 Hardware database lookups are local and optional through the existing libudev
-library. They supplement missing names using a device's own modalias and never
-borrow an ancestor's driver/vendor properties. Input/video function names are
+library. They supplement missing names using a device's own modalias. USB-backed network
+interfaces can use the nearest owning USB device's database name or readable
+manufacturer/product descriptors, with the parent named in source attribution.
+Missing metadata never causes a hub or neighboring adapter name to be substituted.
+Driver bindings remain attributed to the device that owns them. Input/video function names are
 preferred to generic shared USB model labels. CPU models are matched to the
 numeric processor record in /proc/cpuinfo, not inferred from the first CPU or
 from global board fields. An unavailable or oversized file preserves readable
@@ -106,14 +116,14 @@ It assigns no semantic meaning to vendor variables. Tooltips suppress GUID-beari
 unless the internal view is enabled. Equal display names are disambiguated with
 namespace ordinals in path order; these ordinals are presentation labels, not
 firmware namespace identifiers. The existing incarnation/generation rules apply
-to variable records, and inventory totals now include firmware-variable rows.
+to variable records, and inventory totals include firmware-variable rows.
 
 Directory enumeration is not an atomic firmware snapshot. Entries may disappear
 or change permissions concurrently; refresh reconciles the observed metadata.
-The separate Phase 2 properties reader below provides bounded hex inspection
+The separate properties reader below provides bounded hex inspection
 with renewed permission and identity checks; enumeration remains metadata-only.
 
-## Phase 2: device properties
+## Device properties
 
 `DeviceModel::device` returns an owned record copy matched by path and generation,
 including records hidden by the visibility filter. The modeless properties dialog
@@ -123,10 +133,12 @@ one. The tree and Refresh remain usable while a dialog is open.
 
 `PropertiesReader` is a second, window-owned worker, separate from enumeration.
 It reads properties only when Properties is opened or Reload properties is
-requested. There are at most two worker threads, one active properties request
-and one superseding pending request. Closing a dialog invalidates its request;
+requested. MainWindow owns four workers: enumeration/live monitoring, device
+properties, deep search and system information. Each serializes its own work;
+device properties has one active request and one superseding pending request.
+Closing a dialog invalidates its request;
 late results cannot reach a subsequent dialog. Normal shutdown requests
-interruption and keeps the GUI event loop running until both workers finish.
+interruption and keeps the GUI event loop running until all active workers finish.
 Already-running kernel reads and libkmod calls cannot be forcibly canceled.
 
 The properties reader pins the selected sysfs directory with a descriptor and
@@ -135,14 +147,18 @@ initialization stamp, rechecks the path after collection and rejects a changed
 driver link. Documented direct driver/module links are followed explicitly;
 no ancestor binding is presented as the child's binding. This improves detection
 of observed replacement but is not an atomic kernel snapshot or a guarantee
-against every hotplug or driver-rebinding race. The Phase 1 inter-scan instance
-limitation still applies until Phase 4 adds udev monitoring.
+against every hotplug or driver-rebinding race. Live reconciliation uses removal
+evidence and monitoring-loss invalidation to strengthen instance tracking;
+undetected event loss or indistinguishable path reuse can still limit it.
 
 Collection produces raw `Attribute` values, provenance and bytes. The dialog
 alone translates labels, interprets presence/binding/USB authorization, and
 formats hex. Sysfs reads use a subsystem-specific allowlist of text metadata;
-there is no recursive scan, resource/MMIO access, SMART query or firmware method
-evaluation. Text values are limited to 4096 bytes; libkmod output is restricted
+there is no recursive scan, BAR-memory/MMIO access, SMART update request or
+firmware method evaluation. Ordinary text values are limited to 4096 bytes;
+specialized collectors have their own bounds documented in the implementation
+reference. PCIe connection-type reads use a bounded config-header walk as root;
+libkmod output is restricted
 to selected fields and at most 4096 metadata entries. Raw values and inventory
 naming provenance are available through advanced Details. The copy-all action
 includes only currently enabled basic/advanced properties and their sources.
@@ -155,7 +171,7 @@ authors, licenses, descriptions and firmware declarations can differ from code
 already running after an update. Firmware declarations are filenames, not proof
 of loaded firmware or firmware versions. Libkmod remains optional; no subprocess,
 module insertion or removal is used. Other firmware revisions are shown only
-where directly reported by the selected device (currently NVMe).
+where directly reported by the selected device.
 
 EFI value collection first checks the entry's identity, regular-file type and
 world-read bit, then repeats those checks on the opened descriptor. A final
@@ -169,8 +185,8 @@ read-only observation, not an atomic firmware snapshot.
 
 Removal/replacement detected by a property read or successful inventory refresh
 freezes the existing dialog, labels it as a removed snapshot and disables Reload.
-Selection, Details and copying remain available. No live removal notification is
-claimed before Phase 4. Failed reads preserve the previous snapshot with an
+Selection, Details and copying remain available. Live inventory updates also
+invalidate dialogs when the observed device instance is removed or replaced. Failed reads preserve the previous snapshot with an
 explicit error banner, rather than replacing errors with blank or healthy values.
 
 ## Direct resource metadata in properties
@@ -183,7 +199,7 @@ inheritance. The UI adds Resources only when records or explicit collection
 errors exist, and retains that data in removed-device snapshots. Successful
 property reads hide the routine banner; loading and errors still show it.
 
-PCI input comes from the ASCII `resource` file, `irq`, and the documented
+Within the resource collector, PCI input comes from the ASCII `resource` file, `irq`, and the documented
 `msi_irqs` directory. `resourceN`, `rom`, `config`, legacy memory/I/O access files
 and `/proc` resource tables are not opened. Type and allocation come from the
 stable Linux resource flags. Empty slots are skipped without renumbering.
@@ -226,8 +242,9 @@ Sources:
 
 The common interfaces above expose allocations rather than a Windows-style
 per-device conflict verdict. A conflict field is therefore omitted; neither
-sharing nor address containment is used to manufacture one. Broader Resources
-by type/connection tree views from Phase 5 remain outside this change.
+sharing nor address containment is used to manufacture one. Resources by type
+and Resources by connection project the same typed records into the tree, as
+described below.
 
 ## Device filtering
 
@@ -276,10 +293,13 @@ The device-search fixture checks cover numeric aliases, raw/EFI text, invalidate
 property reads, exact displayed labels, category retention, hidden records and
 stale-generation matches. They need compilation/execution on the target machine.
 
-## Phase 3: inventory projections
+## Inventory projections
 
-`DeviceModel::View` selects one of five projections. Stable untranslated view
-IDs are settings keys; translated captions are presentation only. Owned tree
+`DeviceModel::View` selects one of seven projections: Devices by type, Devices
+by connection, Devices by driver, Drivers by device, Drivers by type, Resources
+by type and Resources by connection. Stable untranslated IDs scope tree state
+within the session; translated captions are presentation only. View choice is
+not persisted: every launch starts in Devices by type. Owned tree
 nodes refer to inventory records by canonical path and expose a separate
 NodeKeyRole for expansion restoration. Synthetic category/driver/module nodes
 have no PathRole or GenerationRole and cannot be passed to Properties.
@@ -288,7 +308,9 @@ The enumeration worker captures only the explicitly selected `driver/module`
 symlink for directly bound records. Its absence (including permission or removal
 races) is undetermined, never proof of a built-in driver. A module link establishes
 ownership rather than whether code is built-in/modular or which installed file
-matches running code. No libkmod dependency is added. Non-atomic binding limitations remain; Phase 4 adds monitored instance reconciliation.
+matches running code. This binding observation does not require libkmod;
+optional installed-module metadata uses the existing libkmod support. Non-atomic
+binding limitations remain despite monitored instance reconciliation.
 
 Connection projection closes visible records over available inventory parent
 links, with cycle guards; missing parents are not guessed from path prefixes.
@@ -299,7 +321,7 @@ relationships separately, including its named device. Many drivers may share
 one module without merging their bindings or devices.
 
 Traversal for lookup, search inputs, visible counts and expansion restoration
-now visits arbitrary depth. Recursive proxy filtering keeps ancestors of matching
+visits arbitrary depth. Recursive proxy filtering keeps ancestors of matching
 devices and the synthetic driver/module children of a matching device. It does
 not automatically accept unrelated descendants of a matching connection parent.
 View changes interrupt/invalidate deep-search requests and advance its revision.
@@ -317,14 +339,19 @@ cooperative shutdown flow. There is no device identity to retarget and no callba
 capturing a disposable dialog. Opening File → System Information works even if
 inventory enumeration fails or no root row is selected.
 
-The collector reads only os-release (64 KiB, /etc takes precedence), cpuinfo
+The core overview reads os-release (64 KiB, /etc takes precedence), cpuinfo
 (existing 4 MiB bound), meminfo (64 KiB), uptime, six DMI text fields, EFI-directory
 presence, hypervisor/type and selected CPU topology/cache text fields (4 KiB each).
 CPU lists contain at most 4096 unique IDs; cache collection examines at most
 16384 entries. No recursive arbitrary attribute reader, subprocess, D-Bus service,
 privileged helper, module change, firmware execution or memory mapping is used.
 Interruption is checked between reads; an already blocking kernel read cannot
-be forcibly canceled. Cached snapshots are refreshed only by the dialog button.
+be forcibly canceled. The first dialog opening collects a snapshot; reopening
+reuses it until Refresh is requested. Additional collectors cover Secure Boot/MOK certificates, firmware memory
+records, CPU feature lists and GPU Resizable BAR metadata; their data sources and
+bounds are documented in the implementation reference. SystemDialog presents
+System, Secure Boot, Hardware and firmware, Processor and RAM/Memory tabs;
+Refresh and Copy all cover the entire snapshot. Alt+I opens the dialog.
 
 Topology counts unique package IDs and package/die/core tuples across present
 CPUs; absent optional die IDs remain undetermined components. Negative or missing
@@ -352,11 +379,12 @@ refuses known persistent-memory capacity. Unknown optional nonvolatile size does
 not invalidate known installed sizes. Physical and usable capacity remain separate
 raw byte values; only SystemDialog formats GiB and the nonnegative MiB difference.
 No guessed total, cgroup adjustment or detailed reservation attribution is made.
-The system-properties fixture target now links the existing libudev dependency.
+Detailed memory records use the same cache with a separate 256-record limit.
+The system-properties fixture target links the existing libudev dependency.
 
-## Phase 4: live inventory reconciliation
+## Live inventory reconciliation
 
-Enumerator now lives for the window lifetime. Its native `udev` monitor is
+Enumerator lives for the window lifetime. Its native `udev` monitor is
 worker-owned and enabled before the initial enumeration. No subsystem filter is
 installed: add/remove/change/bind/unbind/move hints can affect all projections.
 Event records are never replayed into inventory. Each coalesced batch triggers a
@@ -365,7 +393,7 @@ EFI metadata. This deliberately favors one maintainable snapshot collector over
 separate per-subsystem incremental discovery rules. Only changed model branches
 are inserted, removed or moved; unchanged nodes and persistent indexes survive.
 An unchanged snapshot skips projection rebuilding and deep-search invalidation.
-View/visibility changes still use model resets, as before.
+View/visibility changes use model resets.
 
 The monitor is drained before and after enumeration. If events arrive during a
 scan, a second fresh scan reconciles them before publication. After at most two
@@ -409,15 +437,14 @@ cooperative-cancellation limitation.
 
 Fixture checks cover bounded event hints, scan change exclusion, retained
 remove/add evidence, loss recovery, persistent indexes through rename/reorder,
-replacement of descendant generations, and additions/removals in all five views.
-They are provided for target-machine execution; this delivery is statically
-verified only.
+replacement of descendant generations, and projection updates. These fixtures
+exercise synthetic observations; they do not establish live hardware coverage.
 
 API references:
 - https://www.freedesktop.org/software/systemd/man/latest/udev_monitor_receive_device.html
 - https://doc.qt.io/qt-6/qabstractitemmodel.html#beginMoveRows
 
-## Phase 5: resource projections
+## Resource projections
 
 The existing enumerator collects bounded PCI/PnP resource metadata relative to a
 pinned device directory between the existing before/after instance checks. Each
@@ -450,5 +477,23 @@ retains its reporting device and ancestors. View changes read no metadata.
 
 Source-level/fixture coverage includes shared formatting, multiple type membership,
 resource-text filtering, actual hidden ancestry, snapshot equality, hot removal,
-and generation-safe assignment ownership/selection. No build or GUI test is run
-for this delivery.
+and generation-safe assignment ownership/selection. Fixture results and live hardware
+validation should be reported separately for each change.
+
+## Specialized property collectors and events
+
+The properties worker also collects network, Ethernet, display/monitor, PCIe,
+battery, USB, camera and storage snapshots. These use explicit applicability
+checks and preserve unsupported, permission-denied, removed and malformed states.
+Ethernet and desktop-session queries, camera capability enumeration and cached
+UDisks2 access are excluded from deep search. Camera queries run in a bounded
+headless helper process; the other collectors remain in the existing workers.
+See the [device-property reference](implementation.md#device-properties) for
+collection budgets, interpretation rules and platform-specific behavior.
+
+`deviceevents` retains bounded live udev observations and associates them with
+local device instances. Properties displays events for its exact instance, while
+removed snapshots keep their retained history. This is in-memory session history;
+no journal mining, persistent event log or diagnostic daemon is added. See
+[live device events](implementation.md#live-device-events) for retention and
+coverage limits.
