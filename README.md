@@ -43,7 +43,7 @@ field in specialized hardware tabs.
 
 ## Download and run on Linux
 
-An **x86_64 AppImage** is available [the releases page](https://github.com/birdie-github/QLinuxDeviceManager/releases).
+An **x86_64 AppImage** is available at [the releases](https://github.com/birdie-github/QLinuxDeviceManager/releases).
 
 In the folder containing the extracted AppImage, run:
 
