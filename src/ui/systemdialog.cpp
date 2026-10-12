@@ -90,7 +90,7 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
 
     auto *os = group(tr("Operating System"));
     field(os, "hostname", tr("Hostname"));
-    field(os, "os", tr("Linux Flavor"));
+    field(os, "os", tr("Linux distribution"));
     auto *separator = new QFrame(os->parentWidget());
     separator->setFrameShape(QFrame::HLine);
     separator->setFrameShadow(QFrame::Sunken);
@@ -104,7 +104,7 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(os, "uptime", tr("Uptime"));
     field(os, "gpu_rebar", tr("Resizable BAR (GPU)"));
 
-    auto *hardware = group(tr("Device"));
+    auto *hardware = group(tr("Hardware"));
     field(hardware, "manufacturer", tr("System manufacturer"));
     field(hardware, "model", tr("System model"));
     field(hardware, "board_vendor", tr("Motherboard manufacturer"));
