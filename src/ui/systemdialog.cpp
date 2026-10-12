@@ -87,17 +87,14 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
         }
         fields_[key].append(value);
     };
-    auto *os = group(tr("System"));
-    field(os, "manufacturer", tr("System manufacturer"));
-    field(os, "model", tr("System model"));
-    field(os, "board_vendor", tr("Motherboard manufacturer"));
-    field(os, "board_model", tr("Motherboard model"));
+
+    auto *os = group(tr("Operating System"));
+    field(os, "hostname", tr("Hostname"));
+    field(os, "os", tr("Linux Flavor"));
     auto *separator = new QFrame(os->parentWidget());
     separator->setFrameShape(QFrame::HLine);
     separator->setFrameShadow(QFrame::Sunken);
     os->addWidget(separator, os->rowCount(), 0, 1, 2);
-    field(os, "hostname", tr("Hostname"));
-    field(os, "os", tr("Operating system"));
     field(os, "architecture", tr("Kernel architecture"));
     field(os, "kernel", tr("Kernel version"));
     field(os, "build", tr("Kernel build"));
@@ -106,10 +103,15 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(os, "virtualization", tr("Virtualization environment"));
     field(os, "uptime", tr("Uptime"));
     field(os, "gpu_rebar", tr("Resizable BAR (GPU)"));
-    auto *hardware = group(tr("BIOS/UEFI"));
+
+    auto *hardware = group(tr("Device"));
+    field(hardware, "manufacturer", tr("System manufacturer"));
+    field(hardware, "model", tr("System model"));
+    field(hardware, "board_vendor", tr("Motherboard manufacturer"));
+    field(hardware, "board_model", tr("Motherboard model"));
     field(hardware, "firmware", tr("Firmware version"));
     field(hardware, "firmware_date", tr("Firmware date (reported)"));
-    field(hardware, "secure_boot", tr("Secure Boot"));
+
     auto *mokPage = new QWidget(hardware->parentWidget());
     mokForm_ = new QGridLayout(mokPage);
     mokForm_->setContentsMargins(0, 0, 0, 0);
@@ -117,6 +119,7 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     hardware->addWidget(mokPage, hardware->rowCount(), 0, 1, 2);
     order_.append("mok");
     captions_.insert("mok", tr("MOK certificates"));
+
     auto *processor = group(tr("Processor"));
     field(processor, "cpu", tr("CPU model(s)"));
     field(processor, "sockets", tr("Sockets (reported topology)"));
@@ -125,6 +128,7 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(processor, "online", tr("Logical CPUs online"));
     field(processor, "caches", tr("CPU caches (online CPUs)"));
     field(processor, "instruction_sets", tr("Instruction sets / CPU features"));
+
     auto *memory = group(tr("RAM/Memory"));
     field(memory, "physical_memory", tr("Physical RAM"));
     field(memory, "memory", tr("Usable RAM"));
