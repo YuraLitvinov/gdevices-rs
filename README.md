@@ -38,29 +38,6 @@ change driver bindings, rescan hardware buses, mount or unlock filesystems, modi
 firmware variables, or power off devices. A device's presence or driver binding
 alone does not establish that its hardware is healthy.
 
-## Screenshots
-
-**Main Window:**
-
-<img src="./screenshots/main-window.webp" alt="Main Window">
-
-**Main Window Search/Filter:**
-
-<img src="./screenshots/main-window-search.webp" alt="Main Window Search/Filter">
-
-**System Information**
-
-<img src="./screenshots/system-information.webp" alt="System Information">
-
-**Device Properties**
-
-<img src="./screenshots/device-properties.webp" alt="Device Properties">
-
-**Monitor Information**
-
-<img src="./screenshots/monitor-information.webp" alt="Monitor/Display Information
-and capabilities, including resolution, color bit depth, refresh rate, and rotation">
-
 ## Using the application
 
 Launch `qlinuxdevicemanager` from a terminal or its desktop application entry.
@@ -515,8 +492,8 @@ lists regular files with the world-read permission bit set. This permission filt
 also applies when running as root. Missing or inaccessible efivarfs does not
 prevent ordinary hardware discovery.
 
-The category and its subtree are hidden by default. Enable **View → Show virtual
-and internal devices** to reveal them; disabling it hides the subtree again.
+The category and its subtree are hidden by default. Enable **View → Show all devices**
+to reveal them; disabling it hides the subtree again.
 
 Names are separated into readable words; original names remain in tooltips.
 Namespace GUIDs and full filenames are shown with internal devices enabled.

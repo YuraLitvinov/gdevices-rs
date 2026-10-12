@@ -98,6 +98,7 @@ MainWindow::MainWindow()
     auto *systemInfo = file->addAction(QIcon::fromTheme("dialog-information",
         style()->standardIcon(QStyle::SP_MessageBoxInformation)), tr("System Information"));
     systemInfo->setToolTip(tr("Show System Information"));
+    systemInfo->setShortcut(QKeySequence(Qt::ALT | Qt::Key_I));
     connect(systemInfo, &QAction::triggered, this, &MainWindow::openSystemInformation);
     file->addSeparator();
     auto *quit = file->addAction(tr("&Quit"));
