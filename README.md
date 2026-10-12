@@ -40,7 +40,7 @@ alone does not establish that its hardware is healthy.
 
 ## Screenshots
 
-You can them [here](SCREENSHOTS.md).
+You can find them [here](SCREENSHOTS.md).
 
 ## Using the application
 
