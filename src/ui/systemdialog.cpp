@@ -8,7 +8,7 @@
 #include <QGridLayout>
 #include <QFont>
 #include <QSizePolicy>
-#include <QGroupBox>
+#include <QTabWidget>
 #include <QLabel>
 #include <QLocale>
 #include <QPushButton>
@@ -41,26 +41,32 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     setWindowTitle(tr("System Information"));
     resize(680, 650);
     auto *layout = new QVBoxLayout(this);
-    auto *scroll = new QScrollArea(this);
-    scroll->setWidgetResizable(true);
-    auto *page = new QWidget(scroll);
-    auto *groups = new QVBoxLayout(page);
-    groups->setSizeConstraint(QLayout::SetMinAndMaxSize);
+    auto *tabs = new QTabWidget(this);
+    tabs->setUsesScrollButtons(true);
+    layout->addWidget(tabs, 1);
     QVector<QGridLayout *> forms;
     QVector<QLabel *> names;
     const auto group = [&](const QString &title) {
-        auto *box = new QGroupBox(title, page);
-        auto *form = new QGridLayout(box);
+        auto *scroll = new QScrollArea(tabs);
+        scroll->setWidgetResizable(true);
+        auto *page = new QWidget(scroll);
+        auto *contents = new QVBoxLayout(page);
+        auto *fields = new QWidget(page);
+        auto *form = new QGridLayout(fields);
+        form->setContentsMargins(0, 0, 0, 0);
+        contents->addWidget(fields);
+        contents->addStretch();
+        scroll->setWidget(page);
+        tabs->addTab(scroll, title);
         form->setColumnStretch(1, 1);
         forms.append(form);
-        groups->addWidget(box);
         return form;
     };
     const auto field = [&](QGridLayout *form, const QString &key, const QString &caption) {
-        auto *name = new QLabel(caption, page);
+        auto *name = new QLabel(caption, form->parentWidget());
         name->setTextFormat(Qt::PlainText);
         names.append(name);
-        auto *value = new QLabel(tr("Not collected"), page);
+        auto *value = new QLabel(tr("Not collected"), form->parentWidget());
         value->setTextFormat(Qt::PlainText);
         value->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
         QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -88,13 +94,13 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     auto *secureBoot = group(tr("Secure Boot"));
     field(secureBoot, "secure_boot", tr("Status"));
     captions_.insert("secure_boot", tr("Secure Boot"));
-    auto *mokTitle = new QLabel(tr("MOK certificates"), page);
+    auto *mokTitle = new QLabel(tr("MOK certificates"), secureBoot->parentWidget());
     mokTitle->setTextFormat(Qt::PlainText);
     QFont headingFont = mokTitle->font();
     headingFont.setBold(true);
     mokTitle->setFont(headingFont);
     secureBoot->addWidget(mokTitle, 1, 0, 1, 2);
-    auto *mokPage = new QWidget(page);
+    auto *mokPage = new QWidget(secureBoot->parentWidget());
     mokForm_ = new QGridLayout(mokPage);
     mokForm_->setContentsMargins(0, 0, 0, 0);
     mokForm_->setColumnStretch(1, 1);
@@ -110,9 +116,6 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(hardware, "firmware_date", tr("Firmware date (reported)"));
     field(hardware, "physical_memory", tr("Physical RAM"));
     field(hardware, "memory", tr("Usable RAM"));
-    memoryForm_ = group(tr("Memory devices (firmware-reported)"));
-    order_.append("memory_devices");
-    captions_.insert("memory_devices", tr("Memory devices (firmware-reported)"));
     auto *processor = group(tr("Processor"));
     field(processor, "cpu", tr("CPU model(s)"));
     field(processor, "sockets", tr("Sockets (reported topology)"));
@@ -120,6 +123,10 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(processor, "logical", tr("Logical CPUs present"));
     field(processor, "online", tr("Logical CPUs online"));
     field(processor, "caches", tr("CPU caches (online CPUs)"));
+    field(processor, "instruction_sets", tr("Instruction sets / CPU features"));
+    memoryForm_ = group(tr("RAM/Memory"));
+    order_.append("memory_devices");
+    captions_.insert("memory_devices", tr("RAM/Memory"));
     // Use one font-derived caption width for every section, so values align.
     int captionWidth = 0;
     for (const QLabel *name : names) captionWidth = qMax(captionWidth, name->sizeHint().width());
@@ -135,9 +142,6 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     mokForm_->setColumnMinimumWidth(0, captionWidth);
     rebuildMok();
     rebuildMemory();
-    groups->addStretch();
-    scroll->setWidget(page);
-    layout->addWidget(scroll, 1);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
     copy_ = buttons->addButton(tr("Copy all"), QDialogButtonBox::ActionRole);
     refresh_ = buttons->addButton(tr("Refresh"), QDialogButtonBox::ActionRole);
@@ -205,6 +209,16 @@ QString SystemDialog::displayValue(const QString &key, const Attribute &value) c
         const qulonglong seconds = value.value.toULongLong();
         return tr("%1 days, %2 hours, %3 minutes").arg(seconds / 86400).arg(seconds / 3600 % 24).arg(seconds / 60 % 60);
     }
+    if (key == "instruction_sets") {
+        const QStringList groups = value.value.split('\n');
+        QStringList lines;
+        for (const QString &group : groups) {
+            const QStringList parts = group.split('\t');
+            lines.append(groups.size() == 1 ? parts.value(1)
+                : tr("Logical CPUs %1: %2").arg(parts.value(0), parts.value(1)));
+        }
+        return lines.join("\n\n");
+    }
     if (key == "caches") {
         QStringList lines;
         for (const QString &raw : value.value.split('\n')) {
@@ -262,7 +276,6 @@ void SystemDialog::rebuildMemory()
         if (heading) { QFont font = value->font(); font.setBold(true); value->setFont(font); }
         memoryForm_->addWidget(value, row++, 0, 1, 2);
     };
-    message(tr("Memory information reported by firmware."));
     const FirmwareMemoryInformation &memory = snapshot_.memoryDevices;
     if (memory.status.state != ReadState::Available) {
         auto *value = label(propertyReadValue(memory.status));
@@ -359,6 +372,10 @@ void SystemDialog::acceptResult(SystemProperties result)
         QString source = snapshot_.sources.value(key);
         if (key == "secure_boot")
             source += '\n' + tr("Firmware SecureBoot state; does not establish shim validation or kernel lockdown policy.");
+        if (key == "instruction_sets")
+            source += '\n' + tr("Kernel-exposed instruction-set and CPU-feature flags for processors listed in /proc/cpuinfo. "
+                "These include non-instruction features and may be limited by the kernel, operating system or hypervisor. "
+                "Different reported feature lists remain separate; this is not a complete raw hardware capability inventory.");
         if (key == "memory")
             source += '\n' + tr("System reserved is reported physical RAM minus Linux MemTotal. "
                                  "It includes all memory unavailable to Linux, not just firmware reservations. "

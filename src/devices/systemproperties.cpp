@@ -237,6 +237,55 @@ void cpuTopology(SystemProperties &result)
 }
 }
 
+Attribute parseCpuInstructionSets(const QString &cpuinfo)
+{
+    // Reuse the bounded /proc/cpuinfo snapshot, never claim a union of features
+    // is supported on every CPU. Preserve kernel tokens, including non-ISA flags.
+    if (cpuinfo.size() > 4 * 1024 * 1024) return failed(EOVERFLOW);
+    QMap<int, QString> processors;
+    QHash<QString, QString> record;
+    Attribute error;
+    bool complete = true;
+    const auto commit = [&] {
+        if (!record.contains("processor")) return;
+        bool ok = false;
+        const int id = record.value("processor").toInt(&ok);
+        if (!ok || id < 0 || processors.contains(id)) { error = failed(EINVAL); complete = false; return; }
+        if (processors.size() >= 4096) { error = failed(EOVERFLOW); complete = false; return; }
+        QString features;
+        for (const char *key : {"flags", "Features", "isa"}) {
+            if (!record.value(QLatin1String(key)).isEmpty()) {
+                features = record.value(QLatin1String(key)).simplified();
+                break;
+            }
+        }
+        if (features.isEmpty()) { complete = false; return; }
+        QStringList tokens = features.split(' ', Qt::SkipEmptyParts);
+        if (tokens.size() > 4096) { error = failed(EOVERFLOW); complete = false; return; }
+        tokens.removeDuplicates();
+        tokens.sort(Qt::CaseSensitive);
+        processors.insert(id, tokens.join(' '));
+    };
+    for (const QString &line : cpuinfo.split('\n')) {
+        if (QThread::currentThread()->isInterruptionRequested()) return failed(ECANCELED);
+        if (line.trimmed().isEmpty()) { commit(); record.clear(); continue; }
+        const int colon = line.indexOf(':');
+        if (colon < 0) continue;
+        const QString key = line.left(colon).trimmed();
+        if (key == "processor" || key == "flags" || key == "Features" || key == "isa")
+            record.insert(key, line.mid(colon + 1).trimmed());
+    }
+    commit();
+    if (!complete) return error;
+    if (processors.isEmpty()) return {};
+    QMap<QString, QStringList> groups;
+    for (auto it = processors.cbegin(); it != processors.cend(); ++it)
+        groups[it.value()].append(QString::number(it.key()));
+    QStringList lines;
+    for (auto it = groups.cbegin(); it != groups.cend(); ++it)
+        lines.append(it.value().join(", ") + '\t' + it.key());
+    return available(lines.join('\n'));
+}
 Attribute parseOsName(const QString &text)
 {
     Attribute result = available("Linux"); // Specified default, only after a successful file read.
@@ -402,6 +451,8 @@ SystemProperties collectSystemProperties()
     QStringList models = parseCpuModels(cpu.value).values();
     models.removeDuplicates(); models.sort(Qt::CaseInsensitive);
     put("cpu", cpu.state == ReadState::Available ? models.isEmpty() ? Attribute() : available(models.join('\n')) : cpu, "/proc/cpuinfo: per-processor model fields");
+    put("instruction_sets", cpu.state == ReadState::Available ? parseCpuInstructionSets(cpu.value) : cpu,
+        "/proc/cpuinfo: per-processor flags, Features or isa; kernel-exposed instruction sets and CPU features");
     cpuTopology(result);
     installedMemory(result);
     result.sources["physical_memory"] = "libudev: dmi/id MEMORY_ARRAY_NUM_DEVICES and MEMORY_DEVICE_n_SIZE/PRESENT; firmware-reported installed RAM";

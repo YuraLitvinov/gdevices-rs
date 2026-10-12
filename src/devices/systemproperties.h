@@ -21,6 +21,7 @@ struct SystemProperties {
 };
 
 // Pure parsers shared with fixtures; no commands or shell evaluation.
+Attribute parseCpuInstructionSets(const QString &cpuinfo);
 Attribute parseOsName(const QString &text);
 FirmwareMemoryInformation parseMemoryDevices(const QHash<QString, QString> &properties);
 Attribute parseInstalledMemory(const QHash<QString, QString> &properties);

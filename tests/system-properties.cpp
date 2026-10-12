@@ -27,6 +27,23 @@ int main(int argc, char **argv)
     check(!parseCpuList("0-500000", cpus), "CPU list expansion is bounded");
     check(!parseCpuList("0,", cpus) && !parseCpuList("-1", cpus) && !parseCpuList("word", cpus),
           "Invalid CPU identifiers never become CPU zero");
+    check(parseCpuInstructionSets("processor : 0\nflags : sse avx2 sse\n\nprocessor : 1\nflags : avx2 sse\n").value
+          == "0, 1\tavx2 sse", "Identical CPU feature lists group without duplicate flags");
+    const Attribute heterogeneous = parseCpuInstructionSets("processor : 0\nflags : sse avx2\n\nprocessor : 1\nflags : sse\n");
+    check(heterogeneous.value.contains("0\tavx2 sse") && heterogeneous.value.contains("1\tsse"),
+          "Different CPU flags never become a universal feature union");
+    check(parseCpuInstructionSets("processor : 0\nFeatures : aes asimd\n").value == "0\taes asimd",
+          "ARM feature field is retained");
+    check(parseCpuInstructionSets("processor : 0\nisa : rv64imafdc\n").value == "0\trv64imafdc",
+          "RISC-V ISA declaration is retained");
+    check(parseCpuInstructionSets("processor : 0\nflags : sse\n\nprocessor : 1\nmodel name : Example\n").state
+          == ReadState::Unavailable, "Missing per-CPU feature list prevents an apparently complete result");
+    check(parseCpuInstructionSets("processor : 0\nflags : sse\n\nprocessor : 0\nflags : avx\n").error == EINVAL,
+          "Duplicate CPU records are rejected");
+    check(parseCpuInstructionSets("Hardware : Board\nFeatures : aes\n").state == ReadState::Unavailable,
+          "Global board fields are not assigned to a processor");
+    check(parseCpuInstructionSets(QString(4 * 1024 * 1024 + 1, 'x')).error == EOVERFLOW,
+          "CPU feature parser input is bounded");
     QHash<QString, QString> memory {
         {"MEMORY_ARRAY_NUM_DEVICES", "2"},
         {"MEMORY_DEVICE_0_SIZE", "17179869184"},

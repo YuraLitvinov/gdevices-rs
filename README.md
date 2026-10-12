@@ -76,7 +76,7 @@ collapses its branch; Enter or **Properties** opens its properties.
 | Search properties and resources | Enable **Deep search** in the search bar |
 | Clear and hide the search bar | **Escape** or **Ctrl+F** |
 | Reveal partitions and implementation records | **View → Show virtual and internal devices** |
-| Open the system overview | **File → System Information** or Properties on the computer root |
+| Open the system overview | **System Information** (leftmost toolbar button), **File → System Information**, or Properties on the computer root |
 | Reread a device's properties | **Reload properties** in its dialog |
 
 Deep search collects metadata in the background. Its cache is refreshed after
@@ -426,7 +426,17 @@ independently.
 The system overview shows hostname, operating system, kernel architecture/release/
 build, CPU models, sockets and cores, present and online logical processors, unique
 cache totals by level/type, uptime, motherboard identity, firmware version/date,
-boot-mode evidence and reported hypervisor identity.
+boot-mode evidence and reported hypervisor identity. Its existing sections are
+presented as scrollable tabs: **System**, **Secure Boot**, **Hardware and firmware**,
+**Processor**, and **RAM/Memory**. Refresh and Copy all cover every tab.
+
+The Processor tab also shows instruction-set and CPU-feature declarations from
+per-processor `flags`, `Features` or `isa` in the existing `/proc/cpuinfo` snapshot.
+Kernel tokens are preserved and identical lists are grouped. Different reported
+lists remain separate rather than claiming their union applies to every CPU.
+Missing per-processor lists leave the result unavailable. These declarations
+include non-instruction features and reflect kernel/OS/hypervisor exposure, not
+an exhaustive raw hardware inventory.
 
 **Physical RAM** uses available firmware-reported capacities from udev metadata.
 **Usable RAM** uses Linux `MemTotal`; it is not currently free memory. When both
@@ -434,8 +444,7 @@ values are valid, their difference is shown as system-reserved RAM, covering all
 memory unavailable to Linux rather than only firmware reservations. Missing
 capacity is left unavailable instead of guessed.
 
-**Memory devices (firmware-reported)** appears below those totals in System
-Information. Each cached udev `dmi/id` record shows capacity, explicit presence
+**RAM/Memory** is a separate System Information tab following **Processor**. Each cached udev `dmi/id` record shows capacity, explicit presence
 when supplied, device/bank locators, type, form factor, rated/configured transfer
 rates in MT/s, manufacturer and part number. Volatile and nonvolatile capacities
 remain separate when reported. The same cache snapshot supplies the existing

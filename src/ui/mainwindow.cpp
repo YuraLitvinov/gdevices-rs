@@ -95,7 +95,9 @@ MainWindow::MainWindow()
     connect(&searchWorker_, &QThread::finished, this, &MainWindow::searchFinished, Qt::QueuedConnection);
 
     auto *file = menuBar()->addMenu(tr("&File"));
-    auto *systemInfo = file->addAction(tr("System Information"));
+    auto *systemInfo = file->addAction(QIcon::fromTheme("dialog-information",
+        style()->standardIcon(QStyle::SP_MessageBoxInformation)), tr("System Information"));
+    systemInfo->setToolTip(tr("Show System Information"));
     connect(systemInfo, &QAction::triggered, this, &MainWindow::openSystemInformation);
     file->addSeparator();
     auto *quit = file->addAction(tr("&Quit"));
@@ -197,6 +199,7 @@ MainWindow::MainWindow()
     auto *toolbar = addToolBar(tr("Main toolbar"));
     toolbar->setObjectName("mainToolbar");
     toolbar->setIconSize(QSize(20, 20));
+    toolbar->addAction(systemInfo);
     toolbar->addAction(refreshAction_);
     toolbar->addAction(propertiesAction_);
     view->addAction(toolbar->toggleViewAction());
