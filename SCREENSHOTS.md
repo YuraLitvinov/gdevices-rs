@@ -20,9 +20,4 @@ QLinuxDeviceManages, a Windows Device Manager alternative for Linux that also wo
 and capabilities, including resolution, color bit depth, refresh rate, and rotation">
 
 ## System Information
-<img src="./screenshots/system.jxl" alt="
-* Operating System (Linux Distro), Kernel version, Architecture, Uptime, Boot Mode (EFI/BIOS), Secure Boot and Resizable BAR statuses
-* System Manufacturer, System Model, Motherboard Manufacturer, Motherboard Model, BIOS/EFI/Firmware version and date, MOK certificates
-* CPU, Cores, Sockets, Supported Instructions, Caches and Cache Hierarchy
-* RAM information including Manufacturer/OEM, size in gigabytes, speed in MT/s, standard (DDR4/DDR5/DDR6), Part Number, Form Factor, Soldered or Upgradeable
-">
+<img src="./screenshots/system.jxl" alt="* Operating System (Linux Distro), Kernel version, Architecture, Uptime, Boot Mode (EFI/BIOS), Secure Boot and Resizable BAR statuses&#10;* System Manufacturer, System Model, Motherboard Manufacturer, Motherboard Model, BIOS/EFI/Firmware version and date, MOK certificates&#10;* CPU, Cores, Sockets, Supported Instructions, Caches and Cache Hierarchy&#10;* RAM information including Manufacturer/OEM, size in gigabytes, speed in MT/s, standard (DDR4/DDR5/DDR6), Part Number, Form Factor, Soldered or Upgradeable">
