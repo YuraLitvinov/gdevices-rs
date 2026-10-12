@@ -94,6 +94,27 @@ void sysfs(DeviceProperties &result, int fd, const char *key)
     const QString name = QLatin1String(key);
     put(result, "sysfs/" + name, readText(fd, key), result.device.path + '/' + name);
 }
+void pcieProperties(DeviceProperties &result, int fd)
+{
+    if (result.device.subsystem != "pci") return;
+    QHash<QString, Attribute> values;
+    bool applicable = false;
+    for (const char *key : {"current_link_speed", "current_link_width", "max_link_speed", "max_link_width"}) {
+        if (QThread::currentThread()->isInterruptionRequested()) return;
+        Attribute value = readText(fd, key);
+        // Absent files alone do not establish PCIe applicability. Preserve actual
+        // read failures so a present but unreadable PCIe device still has a tab.
+        if (value.state == ReadState::Available || value.error != ENOENT)
+            applicable = true;
+        if (value.error == EOPNOTSUPP || value.error == ENOSYS)
+            value.state = ReadState::Unsupported;
+        values.insert(QLatin1String(key), value);
+    }
+    if (!applicable) return;
+    result.pcieApplicable = true;
+    for (auto it = values.cbegin(); it != values.cend(); ++it)
+        put(result, "sysfs/" + it.key(), it.value(), result.device.path + '/' + it.key());
+}
 void usbProperties(DeviceProperties &result, int fd)
 {
     const Device &device = result.device;
@@ -434,6 +455,8 @@ DeviceProperties collectDeviceProperties(const Device &device, bool cachedStorag
             const QByteArray name = key.toLatin1();
             sysfs(result, deviceFd.fd, name.constData());
         }
+        if (cachedStorageService && !QThread::currentThread()->isInterruptionRequested())
+            pcieProperties(result, deviceFd.fd);
         if (!QThread::currentThread()->isInterruptionRequested()) result.resources = collectDeviceResources(deviceFd.fd, d);
         if (!QThread::currentThread()->isInterruptionRequested())
             result.storage = collectStorageProperties(d, cachedStorageService);

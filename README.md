@@ -133,6 +133,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | Driver | Direct driver binding, owning module, available running version and optional installed-module metadata |
 | Network | All assigned IPv4/IPv6 addresses and masks, permanent/current/overridden MAC addresses and MTU, per interface |
 | Display | Desktop-session mode resolution, desktop color depth, nominal refresh rate, rotation/reflection and output scale |
+| PCIe | Current link speed/width and separately reported device maximum speed/width |
 | USB | USB version, connection speed, active configuration, declared power/current, remote wakeup capability and interface functions/drivers |
 | Details | Generic properties, source attribution, advanced raw metadata and copy controls |
 | Resources | Directly reported hardware resource assignments and read/parse errors |
@@ -149,6 +150,26 @@ Properties are collected on demand. F5 refreshes the inventory; **Reload propert
 updates the open device snapshot. A removed or replaced device leaves a marked,
 read-only snapshot with reload disabled. Reconnecting a device at the same kernel
 path does not intentionally retarget the old dialog to the replacement.
+
+The **PCIe** tab uses scrollable, grouped label/value sections on PCI device
+nodes exposing at least one PCIe link attribute (including unreadable attributes).
+Ordinary PCI devices with none of these attributes and non-PCI children do not
+get an empty tab or inherit a parent's link information. Current link speed/width
+are separate from the device's reported maximum speed/width. Known rates from
+2.5 through 128 GT/s are annotated as PCIe generations 1 through 7; unfamiliar
+speed strings are preserved. Lane widths use `xN` notation. Unknown speed and a
+reported zero width are unavailable, not a healthy/zero-speed link. Missing fields,
+unsupported queries, permission failures and malformed values are shown explicitly.
+
+These are kernel-reported link snapshots, not measured throughput. Device maxima
+are separate capability declarations, not a guarantee about the slot or upstream
+path, which is not assessed. Reduced current speed/width is not automatically a
+fault: power management and topology can explain it. Only four bounded sysfs
+reads run in the existing properties worker, with cancellation and device-instance
+checks; no direct PCI configuration-space probing, subprocesses or polling are
+added. The kernel may temporarily runtime-resume a device while servicing these
+reads. **Reload properties** refreshes the snapshot; **Copy PCIe properties** keeps
+section headings and field labels. Raw readings also remain in advanced Details.
 
 The **Network** tab uses grouped, aligned label/value columns like System
 Information, with Link and IP addresses sections for each interface. Each IP

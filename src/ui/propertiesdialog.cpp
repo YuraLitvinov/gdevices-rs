@@ -201,6 +201,26 @@ PropertiesDialog::PropertiesDialog(const Device &device, QWidget *parent) : QDia
     connect(copyUsb, &QPushButton::clicked, this, [this] {
         QApplication::clipboard()->setText(usbText_);
     });
+    pciePage_ = new QWidget(tabs);
+    pciePage_->hide();
+    auto *pcieLayout = new QVBoxLayout(pciePage_);
+    auto *pcieNotice = plainLabel(tr("ℹ️ PCIe link snapshot for this device"), pciePage_);
+    pcieNotice->setToolTip(tr("Current link readings can reflect power management and topology; a lower speed is not a fault verdict. "
+        "Device maxima do not establish the capacity of the upstream path. Reading these sysfs attributes may temporarily "
+        "runtime-resume the device. Reload properties to refresh."));
+    pcieLayout->addWidget(pcieNotice);
+    auto *pcieScroll = new QScrollArea(pciePage_);
+    pcieScroll->setWidgetResizable(true);
+    auto *pcieContent = new QWidget(pcieScroll);
+    pcieGroups_ = new QVBoxLayout(pcieContent);
+    pcieGroups_->setSizeConstraint(QLayout::SetMinAndMaxSize);
+    pcieScroll->setWidget(pcieContent);
+    pcieLayout->addWidget(pcieScroll, 1);
+    auto *copyPcie = new QPushButton(tr("Copy PCIe properties"), pciePage_);
+    pcieLayout->addWidget(copyPcie);
+    connect(copyPcie, &QPushButton::clicked, this, [this] {
+        QApplication::clipboard()->setText(pcieText_);
+    });
     storagePage_ = new QWidget(tabs);
     storagePage_->hide();
     auto *storageLayout = new QVBoxLayout(storagePage_);
@@ -435,6 +455,7 @@ void PropertiesDialog::rebuild()
     rebuildNetwork();
     rebuildDisplay();
     rebuildUsb();
+    rebuildPcie();
     for (const PropertyEntry &entry : entries_) {
         if (entry.tab > 1) continue;
         QFormLayout *form = entry.tab == 0 ? general_ : driver_;
@@ -881,6 +902,105 @@ void PropertiesDialog::rebuildUsb()
     for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
     usbGroups_->addStretch();
     usbText_ = copy.join('\n');
+}
+
+void PropertiesDialog::rebuildPcie()
+{
+    const bool applicable = device().subsystem == "pci" && snapshot_.pcieApplicable;
+    const int existing = tabs_->indexOf(pciePage_);
+    if (applicable && existing < 0) tabs_->insertTab(2, pciePage_, tr("PCIe"));
+    else if (!applicable && existing >= 0) {
+        tabs_->removeTab(existing);
+        pciePage_->hide();
+    }
+    while (QLayoutItem *item = pcieGroups_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    pcieText_.clear();
+    if (!applicable) return;
+    QVector<QGridLayout *> forms;
+    QVector<QLabel *> captions;
+    QStringList copy;
+    const auto group = [&](const QString &title) {
+        auto *box = new QGroupBox(title, pcieGroups_->parentWidget());
+        auto *form = new QGridLayout(box);
+        form->setColumnStretch(1, 1);
+        forms.append(form);
+        pcieGroups_->addWidget(box);
+        if (!copy.isEmpty()) copy.append(QString());
+        copy.append(title);
+        return form;
+    };
+    const auto field = [&](QGridLayout *form, const QString &caption, const QString &text, const QString &source = QString()) {
+        auto *name = new QLabel(caption, form->parentWidget());
+        name->setTextFormat(Qt::PlainText);
+        captions.append(name);
+        auto *value = plainLabel(text, form->parentWidget());
+        QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        policy.setHeightForWidth(true);
+        value->setSizePolicy(policy);
+        value->setAlignment(Qt::AlignLeading | Qt::AlignTop);
+        value->setMinimumWidth(120);
+        const QString hint = "<qt>" + source.toHtmlEscaped() + "</qt>";
+        name->setToolTip(hint);
+        value->setToolTip(hint);
+        const int row = form->count() / 2;
+        form->addWidget(name, row, 0, Qt::AlignLeading | Qt::AlignTop);
+        form->addWidget(value, row, 1);
+        copy.append(caption + ": " + text);
+    };
+    const auto linkValue = [&](const QString &key, bool speed) {
+        const Attribute value = snapshot_.values.value("sysfs/" + key);
+        if (value.state == ReadState::Unsupported) return tr("Query unsupported by the kernel/device");
+        if (value.state != ReadState::Available) return propertyReadValue(value);
+        const QString raw = value.value;
+        const auto malformed = [&] { return tr("Malformed reported value: %1").arg(raw.isEmpty() ? tr("(empty)") : raw); };
+        if (raw.isEmpty()) return malformed();
+        if (speed) {
+            if (raw.compare("Unknown speed", Qt::CaseInsensitive) == 0
+                || raw.compare("unknown", Qt::CaseInsensitive) == 0)
+                return tr("Unavailable (%1)").arg(raw);
+            // Parse the kernel's C-locale rate, including its usual .0 suffix.
+            // Unfamiliar formats and future rates remain visible verbatim.
+            QString rateText = raw;
+            if (rateText.endsWith(" PCIe")) rateText.chop(5);
+            if (!rateText.endsWith(" GT/s")) return raw;
+            rateText.chop(5);
+            bool valid = false;
+            const double rate = rateText.toDouble(&valid);
+            if (!valid || !std::isfinite(rate) || rate <= 0) return malformed();
+            const QVector<double> rates {2.5, 5, 8, 16, 32, 64, 128};
+            for (int i = 0; i < rates.size(); ++i) {
+                if (rate == rates[i]) return tr("%1 (PCIe Gen %2)").arg(raw).arg(i + 1);
+            }
+            return raw;
+        }
+        bool valid = false;
+        const qulonglong lanes = raw.toULongLong(&valid);
+        if (!valid || raw.startsWith('-')) return malformed();
+        if (!lanes) return tr("Unavailable (reported width: %1)").arg(raw);
+        return tr("x%1 (%2 lanes)").arg(QString::number(lanes), QLocale().toString(lanes));
+    };
+    const auto entry = [&](QGridLayout *form, const QString &key, const QString &caption, bool speed, const QString &scope) {
+        field(form, caption, linkValue(key, speed), snapshot_.sources.value("sysfs/" + key) + '\n' + scope);
+    };
+    const QString currentScope = tr("Current link reported for this device; an on-demand reading, not measured throughput or a fault verdict.");
+    auto *current = group(tr("Current link"));
+    entry(current, "current_link_speed", tr("Link speed"), true, currentScope);
+    entry(current, "current_link_width", tr("Link width"), false, currentScope);
+    const QString capabilityScope = tr("Maximum capability reported for this device, not the slot or entire upstream path. Speed and width maxima are separate declarations.");
+    auto *capability = group(tr("Device capability"));
+    entry(capability, "max_link_speed", tr("Maximum link speed"), true, capabilityScope);
+    entry(capability, "max_link_width", tr("Maximum link width"), false, capabilityScope);
+    auto *scope = group(tr("Interpretation"));
+    field(scope, tr("Upstream path"), tr("Not assessed; upstream links may impose additional limits."));
+    field(scope, tr("Current vs. maximum"), tr("A lower current link speed or width is not automatically a fault. Power management and topology can explain differences."));
+    int captionWidth = 0;
+    for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
+    for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
+    pcieGroups_->addStretch();
+    pcieText_ = copy.join('\n');
 }
 
 void PropertiesDialog::rebuildStorage()

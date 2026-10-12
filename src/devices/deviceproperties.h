@@ -31,6 +31,7 @@ struct DeviceProperties {
     Attribute networkState;
     DisplayProperties display;
     UsbProperties usb;
+    bool pcieApplicable = false; // Evidence from this PCI device's link attributes only.
     QByteArray efiBytes;
     bool efiTruncated = false;
     ReadState state = ReadState::Unavailable;
