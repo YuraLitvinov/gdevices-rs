@@ -90,6 +90,13 @@ where needed to distinguish identical devices; tooltips explain their sources.
 Some related records are grouped in the default view and remain individually
 accessible with internal devices shown.
 
+USB-backed network interfaces use the nearest owning USB device's vendor and
+product name, preferring local hwdb names and falling back to readable USB
+manufacturer/product descriptors. Their interface identifiers remain in brackets.
+Name sources identify that USB parent; raw interface properties are retained.
+Missing device metadata does not cause a hub's or neighboring adapter's name to
+be substituted, and genuine underscores in reported names are preserved.
+
 Every launch starts in **Devices by type**, with **Show all devices** off and the
 main toolbar visible. The computer root starts expanded so its categories are
 visible; all subtrees start collapsed. View state is not saved on exit. Window

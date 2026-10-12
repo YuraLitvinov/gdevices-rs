@@ -104,7 +104,8 @@ Inventory Enumerator::collect()
             if (value) d.properties.insert(QLatin1String(key), text(value));
         }
         if (hwdb && (d.subsystem == "pci" || d.subsystem == "usb")
-            && d.properties.value("ID_MODEL_FROM_DATABASE").isEmpty()) {
+            && (d.properties.value("ID_MODEL_FROM_DATABASE").isEmpty()
+                || (d.subsystem == "usb" && d.properties.value("ID_VENDOR_FROM_DATABASE").isEmpty()))) {
             const QByteArray alias = d.properties.value("MODALIAS").toUtf8();
             if (!alias.isEmpty()) {
                 udev_list_entry *property = nullptr;
@@ -155,6 +156,8 @@ Inventory Enumerator::collect()
             d.attributes.insert("type", readAttribute(d.path + "/type"));
             d.attributes.insert("manufacturer", readAttribute(d.path + "/manufacturer"));
         }
+        if (d.subsystem == "usb" && d.devtype == "usb_device")
+            d.attributes.insert("manufacturer", readAttribute(d.path + "/manufacturer"));
         if (d.subsystem == "drm" && d.sysname.contains('-')) {
             d.attributes.insert("status", readAttribute(d.path + "/status"));
             d.attributes.insert("enabled", readAttribute(d.path + "/enabled"));

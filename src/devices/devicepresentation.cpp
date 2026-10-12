@@ -14,7 +14,7 @@ bool pciClass(const Device &d, uint base, int subclass = -1)
 // Follow recorded udev parents to the nearest requested subsystem. PCI callers
 // stop at the first function, so an outer controller cannot represent its child.
 int ancestor(const Device &d, const QVector<Device> &devices, const QHash<QString, int> &lookup,
-             const char *subsystem)
+             const char *subsystem, const char *devtype = nullptr)
 {
     QString path = d.parentPath;
     QSet<QString> visited;
@@ -23,10 +23,39 @@ int ancestor(const Device &d, const QVector<Device> &devices, const QHash<QStrin
         const auto entry = lookup.constFind(path);
         if (entry == lookup.cend()) return -1;
         const Device &parent = devices.at(entry.value());
-        if (parent.subsystem == QLatin1String(subsystem)) return entry.value();
+        if (parent.subsystem == QLatin1String(subsystem)
+            && (!devtype || parent.devtype == QLatin1String(devtype))) return entry.value();
         path = parent.parentPath;
     }
     return -1;
+}
+void usbNetworkName(Device &network, const Device &usb)
+{
+    // Match the owning USB device's database identity, falling back to its
+    // readable descriptors. Do not decode sanitized ID_MODEL by guessing what
+    // underscores originally represented, or inherit a hub's/neighbor's name.
+    QString model = usb.properties.value("ID_MODEL_FROM_DATABASE").trimmed();
+    QString modelSource = usb.propertySources.value("ID_MODEL_FROM_DATABASE", "udev: ID_MODEL_FROM_DATABASE");
+    if (model.isEmpty()) {
+        const Attribute product = usb.attributes.value("product");
+        if (product.state != ReadState::Available || product.value.trimmed().isEmpty()) return;
+        model = product.value.trimmed();
+        modelSource = "sysfs: " + usb.path + "/product";
+    }
+    QString vendor = usb.properties.value("ID_VENDOR_FROM_DATABASE").trimmed();
+    QString vendorSource = usb.propertySources.value("ID_VENDOR_FROM_DATABASE", "udev: ID_VENDOR_FROM_DATABASE");
+    if (vendor.isEmpty()) {
+        const Attribute manufacturer = usb.attributes.value("manufacturer");
+        if (manufacturer.state == ReadState::Available) vendor = manufacturer.value.trimmed();
+        vendorSource = "sysfs: " + usb.path + "/manufacturer";
+    }
+    const bool alreadyNamed = !vendor.isEmpty() && model.startsWith(vendor, Qt::CaseInsensitive)
+        && (model.size() == vendor.size() || !model.at(vendor.size()).isLetterOrNumber());
+    network.name = vendor.isEmpty() || alreadyNamed ? model : vendor + ' ' + model;
+    network.nameSource = "USB device " + usb.path + ": " + modelSource;
+    if (!vendor.isEmpty() && !alreadyNamed) network.nameSource += "; " + vendorSource;
+    network.nameTranslated = false;
+    network.nameCandidate = false;
 }
 }
 
@@ -36,6 +65,13 @@ void refinePresentation(QVector<Device> &devices)
     for (int i = 0; i < devices.size(); ++i) lookup.insert(devices.at(i).path, i);
     QHash<int, QVector<int>> functions;
     for (int i = 0; i < devices.size(); ++i) {
+        if (devices.at(i).subsystem == "net") {
+            const int usb = ancestor(devices.at(i), devices, lookup, "usb", "usb_device");
+            // Stop at the nearest USB device even if it has no readable name;
+            // never continue outward to a hub or host controller for a label.
+            if (usb >= 0 && !devices.at(usb).sysname.startsWith("usb"))
+                usbNetworkName(devices[i], devices.at(usb));
+        }
         const Device &d = devices.at(i);
         if (isAudioJackSwitch(d)) {
             const int card = ancestor(d, devices, lookup, "sound");
