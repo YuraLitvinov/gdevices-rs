@@ -10,6 +10,7 @@
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
+#include <linux/pci_regs.h>
 #include <memory>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -94,6 +95,57 @@ void sysfs(DeviceProperties &result, int fd, const char *key)
     const QString name = QLatin1String(key);
     put(result, "sysfs/" + name, readText(fd, key), result.device.path + '/' + name);
 }
+Attribute pcieDeviceType(int directory, QString &source)
+{
+    // Ordinary sysfs link reads remain usable without administrative privileges.
+    // Never escalate or attempt a configuration-space read for a normal user.
+    if (geteuid() != 0) return failure(EACCES);
+    Descriptor config(openat(directory, "config", O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+    if (config.fd < 0) return failure(errno);
+    const auto readValue = [&](int offset, int size, unsigned int &value) -> Attribute {
+        if (QThread::currentThread()->isInterruptionRequested()) return failure(ECANCELED);
+        unsigned char bytes[2] {};
+        const ssize_t count = pread(config.fd, bytes, size, offset);
+        if (count < 0) return failure(errno);
+        if (count != size) return failure(EMSGSIZE);
+        value = bytes[0] | (size == 2 ? static_cast<unsigned int>(bytes[1]) << 8 : 0);
+        return available(QString());
+    };
+    unsigned int status = 0, header = 0, pointer = 0;
+    Attribute state = readValue(PCI_STATUS, 2, status);
+    if (state.state != ReadState::Available) return state;
+    if (status == 0xffff) return failure(ENODEV);
+    if (!(status & PCI_STATUS_CAP_LIST)) return failure(ENODATA);
+    state = readValue(PCI_HEADER_TYPE, 1, header);
+    if (state.state != ReadState::Available) return state;
+    header &= PCI_HEADER_TYPE_MASK;
+    if (header != PCI_HEADER_TYPE_NORMAL && header != PCI_HEADER_TYPE_BRIDGE
+        && header != PCI_HEADER_TYPE_CARDBUS) return failure(EPROTO);
+    state = readValue(header == PCI_HEADER_TYPE_CARDBUS ? PCI_CB_CAPABILITY_LIST : PCI_CAPABILITY_LIST, 1, pointer);
+    if (state.state != ReadState::Available) return state;
+    // Follow only standard capability headers and the two-byte Express flags.
+    // At most 48 aligned entries in bytes 0x40..0xff; no extended-space scan,
+    // capability payload dump, BAR access, or write to the device.
+    bool visited[256] {};
+    for (int entries = 0; pointer && entries < 48; ++entries) {
+        if (pointer < 0x40 || pointer > 0xfc || (pointer & 3) || visited[pointer])
+            return failure(EPROTO);
+        visited[pointer] = true;
+        unsigned int capability = 0;
+        state = readValue(static_cast<int>(pointer), 2, capability);
+        if (state.state != ReadState::Available) return state;
+        if ((capability & 0xff) == PCI_CAP_ID_EXP) {
+            unsigned int flags = 0;
+            state = readValue(static_cast<int>(pointer) + PCI_EXP_FLAGS, 2, flags);
+            if (state.state != ReadState::Available) return state;
+            if (flags == 0xffff || !(flags & PCI_EXP_FLAGS_VERS)) return failure(EPROTO);
+            source += QStringLiteral("; PCI Express flags at offset 0x%1").arg(pointer + PCI_EXP_FLAGS, 2, 16, QLatin1Char('0'));
+            return available(QString::number((flags & PCI_EXP_FLAGS_TYPE) >> 4));
+        }
+        pointer = capability >> 8;
+    }
+    return failure(pointer ? EPROTO : ENODATA);
+}
 void pcieProperties(DeviceProperties &result, int fd)
 {
     if (result.device.subsystem != "pci") return;
@@ -114,6 +166,9 @@ void pcieProperties(DeviceProperties &result, int fd)
     result.pcieApplicable = true;
     for (auto it = values.cbegin(); it != values.cend(); ++it)
         put(result, "sysfs/" + it.key(), it.value(), result.device.path + '/' + it.key());
+    result.pcieTypeSource = result.device.path + "/config";
+    result.pcieTypeRequiresRoot = geteuid() != 0;
+    result.pcieType = pcieDeviceType(fd, result.pcieTypeSource);
 }
 void usbProperties(DeviceProperties &result, int fd)
 {

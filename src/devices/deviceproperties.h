@@ -32,6 +32,9 @@ struct DeviceProperties {
     DisplayProperties display;
     UsbProperties usb;
     bool pcieApplicable = false; // Evidence from this PCI device's link attributes only.
+    Attribute pcieType; // Numeric PCI Express device/port type; no GPU-ID inference.
+    QString pcieTypeSource;
+    bool pcieTypeRequiresRoot = false;
     QByteArray efiBytes;
     bool efiTruncated = false;
     ReadState state = ReadState::Unavailable;

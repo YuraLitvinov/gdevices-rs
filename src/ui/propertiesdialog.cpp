@@ -991,17 +991,52 @@ void PropertiesDialog::rebuildPcie()
     const auto entry = [&](QGridLayout *form, const QString &key, const QString &caption, bool speed, const QString &scope) {
         field(form, caption, linkValue(key, speed), snapshot_.sources.value("sysfs/" + key) + '\n' + scope);
     };
-    const QString currentScope = tr("Current link reported for this device; an on-demand reading, not measured throughput or a fault verdict.");
-    auto *current = group(tr("Current link"));
-    entry(current, "current_link_speed", tr("Link speed"), true, currentScope);
-    entry(current, "current_link_width", tr("Link width"), false, currentScope);
-    const QString capabilityScope = tr("Maximum capability reported for this device, not the slot or entire upstream path. Speed and width maxima are separate declarations.");
-    auto *capability = group(tr("Device capability"));
-    entry(capability, "max_link_speed", tr("Maximum link speed"), true, capabilityScope);
-    entry(capability, "max_link_width", tr("Maximum link width"), false, capabilityScope);
-    auto *scope = group(tr("Interpretation"));
-    field(scope, tr("Upstream path"), tr("Not assessed; upstream links may impose additional limits."));
-    field(scope, tr("Current vs. maximum"), tr("A lower current link speed or width is not automatically a fault. Power management and topology can explain differences."));
+    const Attribute type = snapshot_.pcieType;
+    bool validType = false;
+    const uint number = type.value.toUInt(&validType);
+    validType = validType && type.state == ReadState::Available;
+    QString typeText = propertyReadValue(type);
+    if (type.state == ReadState::Error && type.error == EPROTO)
+        typeText = tr("Malformed PCI capability data");
+    else if (type.state == ReadState::Error && type.error == EMSGSIZE)
+        typeText = tr("Incomplete PCI configuration data");
+    if (validType) {
+        switch (number) {
+        case 0: typeText = tr("PCIe endpoint"); break;
+        case 1: typeText = tr("Legacy PCIe endpoint"); break;
+        case 4: typeText = tr("Root port"); break;
+        case 5: typeText = tr("Upstream switch port"); break;
+        case 6: typeText = tr("Downstream switch port"); break;
+        case 7: typeText = tr("PCIe-to-PCI/PCI-X bridge"); break;
+        case 8: typeText = tr("PCI/PCI-X-to-PCIe bridge"); break;
+        case 9: typeText = tr("Root Complex Integrated Endpoint"); break;
+        case 10: typeText = tr("Root Complex Event Collector"); break;
+        default: typeText = tr("Unrecognized PCIe device type: %1").arg(type.value); break;
+        }
+    }
+    auto *connection = group(tr("Connection"));
+    field(connection, tr("Connection type"), typeText, snapshot_.pcieTypeSource);
+    if (snapshot_.pcieTypeRequiresRoot) {
+        field(connection, tr("Access"), tr("Run the application as root or with sudo to read this device's PCIe connection type."), snapshot_.pcieTypeSource);
+    }
+    // Both root-complex types lack conventional PCIe link registers. This
+    // identifies connection topology, not GPU integration or performance.
+    const bool internal = validType && (number == 9 || number == 10);
+    if (internal) {
+        field(connection, tr("PCIe link"), tr("Not applicable — integrated into the root complex; no external PCIe link."), snapshot_.pcieTypeSource);
+    } else {
+        const QString currentScope = tr("Current link reported for this device; an on-demand reading, not measured throughput or a fault verdict.");
+        auto *current = group(tr("Current link"));
+        entry(current, "current_link_speed", tr("Link speed"), true, currentScope);
+        entry(current, "current_link_width", tr("Link width"), false, currentScope);
+        const QString capabilityScope = tr("Maximum capability reported for this device, not the slot or entire upstream path. Speed and width maxima are separate declarations.");
+        auto *capability = group(tr("Device capability"));
+        entry(capability, "max_link_speed", tr("Maximum link speed"), true, capabilityScope);
+        entry(capability, "max_link_width", tr("Maximum link width"), false, capabilityScope);
+        auto *scope = group(tr("Interpretation"));
+        field(scope, tr("Upstream path"), tr("Not assessed; upstream links may impose additional limits."));
+        field(scope, tr("Current vs. maximum"), tr("A lower current link speed or width is not automatically a fault. Power management and topology can explain differences."));
+    }
     int captionWidth = 0;
     for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
     for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);

@@ -133,7 +133,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | Driver | Direct driver binding, owning module, available running version and optional installed-module metadata |
 | Network | All assigned IPv4/IPv6 addresses and masks, permanent/current/overridden MAC addresses and MTU, per interface |
 | Display | Desktop-session mode resolution, desktop color depth, nominal refresh rate, rotation/reflection and output scale |
-| PCIe | Current link speed/width and separately reported device maximum speed/width |
+| PCIe | Current link speed/width, reported device maximum speed/width, and connection type when running as root |
 | USB | USB version, connection speed, active configuration, declared power/current, remote wakeup capability and interface functions/drivers |
 | Details | Generic properties, source attribution, advanced raw metadata and copy controls |
 | Resources | Directly reported hardware resource assignments and read/parse errors |
@@ -166,12 +166,29 @@ unsupported queries, permission failures and malformed values are shown explicit
 These are kernel-reported link snapshots, not measured throughput. Device maxima
 are separate capability declarations, not a guarantee about the slot or upstream
 path, which is not assessed. Reduced current speed/width is not automatically a
-fault: power management and topology can explain it. Only four bounded sysfs
+fault: power management and topology can explain it. Four bounded sysfs link
 reads run in the existing properties worker, with cancellation and device-instance
-checks; no direct PCI configuration-space probing, subprocesses or polling are
-added. The kernel may temporarily runtime-resume a device while servicing these
+checks. The kernel may temporarily runtime-resume a device while servicing these
 reads. **Reload properties** refreshes the snapshot; **Copy PCIe properties** keeps
 section headings and field labels. Raw readings also remain in advanced Details.
+
+When running as root (including through `sudo`), the same on-demand worker also
+reads the selected device's PCIe connection type from its sysfs `config` file.
+It follows at most 48 standard capability headers within the first 256 bytes,
+reading only the necessary header fields and PCI Express flags; invalid offsets,
+loops, truncated reads, permission failures and removal are handled explicitly.
+It does not dump configuration space, scan extended capabilities, access BARs,
+write settings, invoke subprocesses or poll in the background. Normal-user runs
+skip configuration reads and show a note explaining that root access is needed
+for the connection type; elevation does not guarantee all information is available.
+
+A confirmed **Root Complex Integrated Endpoint** or **Root Complex Event Collector**
+shows that conventional PCIe link speed and lane width are not applicable. Its
+current/max-link sections and upstream interpretation are replaced with that
+connection explanation. Other devices and failed type reads retain the link
+sections. This is a generic PCIe topology classification, not an iGPU-ID database,
+and it makes no claim about maximum operating performance. Raw sysfs link readings
+remain available in advanced Details, including on integrated endpoints.
 
 The **Network** tab uses grouped, aligned label/value columns like System
 Information, with Link and IP addresses sections for each interface. Each IP
