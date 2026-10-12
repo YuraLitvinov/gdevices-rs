@@ -28,7 +28,8 @@ does not upload it.
   refresh rate, rotation and scale; PCIe link speed and lane width; GPU Resizable
   BAR capabilities and allocated sizes where available.
 - **Storage and drive health:** drive model, capacity and firmware, partitions,
-  filesystems and mount points, plus available cached SMART and NVMe health data.
+  filesystems and mount points, plus detailed cached ATA SMART attributes and
+  NVMe health counters where UDisks2 provides them.
 - **USB devices, cameras and batteries:** USB version and connection speed,
   camera formats and resolutions, battery capacity, cycle count and charging status.
 - **Live device events:** see devices appear or disappear as you connect or remove

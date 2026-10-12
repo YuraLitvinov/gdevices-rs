@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QSet>
 #include <QStringList>
+#include <QLocale>
 
 namespace {
 QString tr(const char *text) { return QCoreApplication::translate("Storage", text); }
@@ -75,6 +76,29 @@ void fact(QVector<StorageDisplayField> &output, const StorageEntity &entity,
     QString text = values.isEmpty() ? storageFieldValue(*fallback) : values.join("\n");
     if (values.size() > 1) text = tr("Conflicting metadata:") + '\n' + text;
     output.append({tr(caption), text, sources.join('\n')});
+}
+StorageDisplayField ataAttribute(const AtaSmartAttribute &attribute, const QString &drive)
+{
+    const auto normalized = [](qint32 value) { return value < 0 ? tr("Unavailable") : QLocale().toString(value); };
+    QStringList lines;
+    lines << tr("Normalized value: %1").arg(normalized(attribute.current))
+          << tr("Worst normalized value: %1").arg(normalized(attribute.worst))
+          << tr("Threshold: %1").arg(normalized(attribute.threshold));
+    QString interpreted;
+    if (attribute.unit == 0 || (attribute.unit == 4 && attribute.interpreted == 0)) interpreted = tr("Unavailable");
+    else if (attribute.interpreted < 0) interpreted = tr("Invalid health metadata");
+    else switch (attribute.unit) {
+    case 1: interpreted = QLocale().toString(attribute.interpreted); break;
+    case 2: interpreted = tr("%1 milliseconds").arg(QLocale().toString(attribute.interpreted)); break;
+    case 3: interpreted = tr("%1 sectors").arg(QLocale().toString(attribute.interpreted)); break;
+    case 4: interpreted = tr("%1 °C").arg(QLocale().toString(attribute.interpreted / 1000.0 - 273.15, 'f', 1)); break;
+    default: interpreted = tr("Unavailable (unknown unit %1)").arg(attribute.unit); break;
+    }
+    lines << tr("Interpreted value: %1").arg(interpreted)
+          << tr("Flags: 0x%1").arg(attribute.flags, 4, 16, QLatin1Char('0'));
+    const QString label = attribute.name.isEmpty() ? tr("ATA SMART attribute (ID %1)").arg(attribute.id)
+        : tr("%1 (ID %2)").arg(attribute.name).arg(attribute.id);
+    return {label, lines.join('\n'), drive + " : org.freedesktop.UDisks2.Drive.Ata.SmartGetAttributes : ID " + QString::number(attribute.id)};
 }
 QString relation(const StorageLink &link)
 {
@@ -168,6 +192,7 @@ StoragePresentation storagePresentation(const StorageProperties &snapshot, const
             if (!nodes.isEmpty()) row.name += " — " + nodes.join(", ");
             row.kind = tr("Cached drive health");
             for (const StorageField &field : entity.fields) if (healthField(field)) row.fields.append(display(field));
+            for (const AtaSmartAttribute &attribute : entity.ataAttributes) row.fields.append(ataAttribute(attribute, entity.id));
             if (row.fields.isEmpty()) row.fields.append({tr("Cached health"), tr("Unavailable"), entity.id});
             result.health.append(row);
             if (selectedDrives.size() > 1 && selectedDrives.contains(entity.id)) {

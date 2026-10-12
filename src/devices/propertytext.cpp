@@ -62,6 +62,7 @@ QString storageFieldValue(const StorageField &field)
     }
     case Format::Percent:
     case Format::Hours:
+    case Format::Seconds:
     case Format::Minutes:
     case Format::Count: {
         bool valid = false;
@@ -69,6 +70,7 @@ QString storageFieldValue(const StorageField &field)
         if (!valid) return QCoreApplication::translate("Storage", "Invalid health metadata");
         const QString text = QLocale().toString(number);
         if (field.format == Format::Percent) return QCoreApplication::translate("Storage", "%1%").arg(text);
+        if (field.format == Format::Seconds) return QCoreApplication::translate("Storage", "%1 seconds (%2 hours)").arg(text, QLocale().toString(number / 3600.0, 'f', 1));
         if (field.format == Format::Hours) return QCoreApplication::translate("Storage", "%1 hours").arg(text);
         if (field.format == Format::Minutes) return QCoreApplication::translate("Storage", "%1 minutes").arg(text);
         return text;

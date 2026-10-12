@@ -390,7 +390,7 @@ spare threshold, estimated endurance used, total bytes read/written, controller
 busy time, power cycles, unsafe shutdowns, media/data-integrity errors, error-log
 entry count, temperature sensors, temperature thresholds and time above them.
 The method returns UDisks2's stored log; it does not request a SMART update.
-Detailed-cache calls share a 2.5-second wait budget across related controllers,
+ATA and NVMe detailed-cache calls share a 2.5-second wait budget across related drives,
 with cancellation checks every 50 ms, no service activation or interactive
 authorization, and accepted replies limited to 64 dictionary entries and eight
 sensors. Missing keys, invalid D-Bus types, unsupported methods, permission
@@ -405,6 +405,26 @@ estimates, not raw NVMe data-unit counters. Counts summarize error-log entries;
 individual error records, past self-test logs and thermal transition counters
 are not exposed by this collection. Health data is controller-wide and is not
 attributed as namespace-specific measurements.
+
+ATA HDDs and SSDs also use cached `Drive.Ata.SmartGetAttributes`, including
+USB-attached drives when UDisks2 exposes that interface through their bridge.
+The Health tab shows power-on seconds/hours, past attribute-failure count and
+all returned attributes, retaining the authoritative drive-specific name and ID,
+current/worst/threshold normalized values, flags and UDisks2's interpreted value.
+Unknown normalized values (`-1`) remain unavailable; valid zeros are preserved.
+Unit 0 means no interpreted value. Known interpreted units are dimensionless,
+milliseconds, sectors and millikelvin; unknown units are not guessed. These are
+interpreted values, not raw smartctl counters. Attribute IDs alone are not used
+to infer SSD endurance or assign vendor-specific meanings.
+
+ATA replies must match `a(ysqiiixia{sv})`, with at most 256 unique attributes,
+128 UTF-8 bytes per name and 64 expansion entries per record. Oversized or
+malformed lists are rejected as a whole. No tests, SMART updates, drive wakeups
+or SMART-enable operations are requested. Drives without an ATA or NVMe health
+interface show unsupported health access: this includes native SAS/SCSI devices
+not exposed through these APIs, and many removable/virtual devices. USB support
+depends on the bridge and UDisks2. No universal SMART capability is inferred from
+whether a device is an HDD, SSD or connected through USB.
 
 ## System information
 

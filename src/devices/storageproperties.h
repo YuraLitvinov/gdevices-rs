@@ -4,16 +4,25 @@
 
 // Owned metadata only. Relationships are explicit edges, never capacity totals.
 struct StorageField {
-    enum class Format { Text, Bytes, Boolean, Removable, Epoch, Kelvin, Percent, Hours, Minutes, Count, AtaHealth, NvmeHealth };
+    enum class Format { Text, Bytes, Boolean, Removable, Epoch, Kelvin, Percent, Hours, Seconds, Minutes, Count, AtaHealth, NvmeHealth };
     QString id;
     const char *label = nullptr; // Static translatable caption, not device input.
     Attribute value;
     QString source;
     Format format = Format::Text;
 };
+struct AtaSmartAttribute {
+    quint8 id = 0;
+    QString name; // UDisks2's drive-specific identifier, not guessed from the ID.
+    quint16 flags = 0;
+    qint32 current = -1, worst = -1, threshold = -1;
+    qint64 interpreted = 0;
+    qint32 unit = 0; // UDisks2 unit; zero means no interpreted value.
+};
 struct StorageEntity {
     QString id; // Canonical sysfs path or UDisks object path, snapshot-local.
     QVector<StorageField> fields;
+    QVector<AtaSmartAttribute> ataAttributes;
 };
 struct StorageLink {
     QString from;

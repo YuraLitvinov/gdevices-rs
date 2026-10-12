@@ -24,6 +24,7 @@
 #include <QDBusObjectPath>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
+#include <QDBusReply>
 #include <QEventLoop>
 #include <QElapsedTimer>
 #include <QTimer>
@@ -153,18 +154,14 @@ void serviceField(StorageEntity &entity, const QVariantMap &properties, const QS
     field(entity.fields, interface + '/' + QLatin1String(key), label, data,
           entity.id + " : " + interface + '.' + QLatin1String(key), format);
 }
-// Cache-only method: UDisks2 returns its stored log, without SmartUpdate or tests.
-void nvmeAttributes(StorageEntity &entity, QElapsedTimer &budget)
+// Shared cache-method wait budget; no service activation or authorization dialog.
+QDBusMessage healthReply(const QString &path, const QString &iface, QElapsedTimer &budget, Attribute &state)
 {
-    const QString iface = QStringLiteral("org.freedesktop.UDisks2.NVMe.Controller");
-    const QString source = entity.id + " : " + iface + ".SmartGetAttributes";
-    const auto note = [&](const Attribute &state) {
-        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached NVMe health details"), state, source);
-    };
+    const auto fail = [&](const Attribute &error) { state = error; return QDBusMessage(); };
     const int remaining = 2500 - static_cast<int>(budget.elapsed());
-    if (QThread::currentThread()->isInterruptionRequested()) { note(failure(ECANCELED)); return; }
-    if (remaining <= 0) { note(failure(ETIMEDOUT)); return; }
-    auto message = QDBusMessage::createMethodCall("org.freedesktop.UDisks2", entity.id, iface, "SmartGetAttributes");
+    if (QThread::currentThread()->isInterruptionRequested()) return fail(failure(ECANCELED));
+    if (remaining <= 0) return fail(failure(ETIMEDOUT));
+    auto message = QDBusMessage::createMethodCall("org.freedesktop.UDisks2", path, iface, "SmartGetAttributes");
     message.setAutoStartService(false);
     message.setInteractiveAuthorizationAllowed(false);
     message << QVariant::fromValue(QVariantMap());
@@ -178,19 +175,35 @@ void nvmeAttributes(StorageEntity &entity, QElapsedTimer &budget)
     });
     cancellation.start();
     if (!watcher.isFinished()) loop.exec();
-    if (QThread::currentThread()->isInterruptionRequested()) { note(failure(ECANCELED)); return; }
-    if (!watcher.isFinished()) { note(failure(ETIMEDOUT)); return; }
-    QDBusPendingReply<QVariantMap> reply = watcher;
-    if (reply.isError()) {
-        const QDBusError error = reply.error();
-        const ReadState state = error.type() == QDBusError::AccessDenied ? ReadState::PermissionDenied
+    if (QThread::currentThread()->isInterruptionRequested()) return fail(failure(ECANCELED));
+    if (!watcher.isFinished()) return fail(failure(ETIMEDOUT));
+    const QDBusMessage reply = watcher.reply();
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        const QDBusError error(reply);
+        const ReadState readState = error.type() == QDBusError::AccessDenied ? ReadState::PermissionDenied
             : error.type() == QDBusError::UnknownMethod || error.type() == QDBusError::UnknownInterface ? ReadState::Unsupported
             : error.type() == QDBusError::ServiceUnknown || error.type() == QDBusError::UnknownObject ? ReadState::Unavailable
             : ReadState::Error;
-        note({state, {}, error.type() == QDBusError::NoReply || error.type() == QDBusError::Timeout
+        return fail({readState, {}, error.type() == QDBusError::NoReply || error.type() == QDBusError::Timeout
             || error.type() == QDBusError::TimedOut ? ETIMEDOUT : EIO});
-        return;
     }
+    if (reply.type() != QDBusMessage::ReplyMessage || reply.arguments().size() != 1) return fail(failure(EINVAL));
+    state = ok(QString());
+    return reply;
+}
+// Cache-only method: UDisks2 returns its stored log, without SmartUpdate or tests.
+void nvmeAttributes(StorageEntity &entity, QElapsedTimer &budget)
+{
+    const QString iface = QStringLiteral("org.freedesktop.UDisks2.NVMe.Controller");
+    const QString source = entity.id + " : " + iface + ".SmartGetAttributes";
+    const auto note = [&](const Attribute &state) {
+        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached NVMe health details"), state, source);
+    };
+    Attribute state;
+    const QDBusMessage message = healthReply(entity.id, iface, budget, state);
+    if (state.state != ReadState::Available) { note(state); return; }
+    const QDBusReply<QVariantMap> reply(message);
+    if (!reply.isValid()) { note(failure(EINVAL)); return; }
     const QVariantMap values = reply.value();
     if (values.size() > 64) { note(failure(EOVERFLOW)); return; }
     const auto add = [&](const char *key, const char *label, int type, Format format, bool zeroUnknown = false) {
@@ -256,6 +269,44 @@ void nvmeAttributes(StorageEntity &entity, QElapsedTimer &budget)
               source + QStringLiteral(" : temp_sensors[%1]").arg(i), Format::Kelvin);
     }
 }
+void ataAttributes(StorageEntity &entity, QElapsedTimer &budget)
+{
+    const QString iface = QStringLiteral("org.freedesktop.UDisks2.Drive.Ata");
+    const QString source = entity.id + " : " + iface + ".SmartGetAttributes";
+    const auto note = [&](const Attribute &state) {
+        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached ATA SMART attributes"), state, source);
+    };
+    Attribute state;
+    const QDBusMessage reply = healthReply(entity.id, iface, budget, state);
+    if (state.state != ReadState::Available) { note(state); return; }
+    const QVariant value = reply.arguments().constFirst();
+    if (value.metaType().id() != qMetaTypeId<QDBusArgument>()) { note(failure(EINVAL)); return; }
+    const QDBusArgument array = value.value<QDBusArgument>();
+    if (array.currentSignature() != "a(ysqiiixia{sv})") { note(failure(EINVAL)); return; }
+    QVector<AtaSmartAttribute> attributes;
+    QSet<quint8> ids;
+    array.beginArray();
+    while (!array.atEnd()) {
+        if (QThread::currentThread()->isInterruptionRequested()) { state = failure(ECANCELED); break; }
+        if (attributes.size() >= 256) { state = failure(EOVERFLOW); break; }
+        AtaSmartAttribute attribute;
+        QVariantMap expansion;
+        array.beginStructure();
+        array >> attribute.id >> attribute.name >> attribute.flags >> attribute.current >> attribute.worst
+              >> attribute.threshold >> attribute.interpreted >> attribute.unit >> expansion;
+        array.endStructure();
+        const auto normalized = [](qint32 number) { return number >= -1 && number <= 255; };
+        if (attribute.name.toUtf8().size() > 128 || expansion.size() > 64) { state = failure(EOVERFLOW); break; }
+        if (ids.contains(attribute.id) || !normalized(attribute.current) || !normalized(attribute.worst)
+            || !normalized(attribute.threshold) || attribute.unit < 0) { state = failure(EINVAL); break; }
+        ids.insert(attribute.id);
+        attributes.append(std::move(attribute));
+    }
+    array.endArray();
+    if (state.state != ReadState::Available) { note(state); return; }
+    if (attributes.isEmpty()) { note({}); return; }
+    entity.ataAttributes = std::move(attributes); // Publish complete, validated list only.
+}
 void addService(StorageProperties &result, const QSet<QString> &nativePaths)
 {
     const StorageObjects objects = serviceSnapshot(result);
@@ -296,7 +347,7 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths)
         if (wanted.size() == before) break;
     }
     QElapsedTimer healthBudget;
-    healthBudget.start(); // Shared by all related NVMe cache-method calls.
+    healthBudget.start(); // Shared by all related ATA and NVMe cache-method calls.
     for (auto it = objects.cbegin(); it != objects.cend(); ++it) {
         if (QThread::currentThread()->isInterruptionRequested()) return;
         if (!wanted.contains(it.key().path())) continue;
@@ -361,11 +412,22 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths)
             if (health.value("SmartUpdated").toULongLong() != 0) {
                 serviceField(entity, health, prefix + iface, "SmartTemperature", QT_TRANSLATE_NOOP("Storage", "Cached temperature"), Format::Kelvin, true);
                 if (ata) {
+                    copy("Drive.Ata", "SmartPowerOnSeconds", QT_TRANSLATE_NOOP("Storage", "Cached power-on time"), Format::Seconds, true);
                     copy("Drive.Ata", "SmartFailing", QT_TRANSLATE_NOOP("Storage", "Cached ATA failure prediction"), Format::AtaHealth);
                     for (const auto &pair : {qMakePair("SmartNumBadSectors", QT_TRANSLATE_NOOP("Storage", "Cached bad sectors")),
-                                             qMakePair("SmartNumAttributesFailing", QT_TRANSLATE_NOOP("Storage", "Cached failing attributes"))}) {
-                        if (health.value(pair.first, -1).toLongLong() >= 0) copy("Drive.Ata", pair.first, pair.second);
+                                             qMakePair("SmartNumAttributesFailing", QT_TRANSLATE_NOOP("Storage", "Cached failing attributes")),
+                                             qMakePair("SmartNumAttributesFailedInThePast", QT_TRANSLATE_NOOP("Storage", "Cached attributes failed in the past"))}) {
+                        const QVariant count = health.value(QLatin1String(pair.first));
+                        const int type = QLatin1String(pair.first) == QLatin1String("SmartNumBadSectors") ? QMetaType::LongLong : QMetaType::Int;
+                        Attribute data;
+                        if (count.isValid()) {
+                            if (count.metaType().id() != type || count.toLongLong() < -1) data = failure(EINVAL);
+                            else if (count.toLongLong() >= 0) data = ok(QString::number(count.toLongLong()));
+                        }
+                        field(entity.fields, prefix + "Drive.Ata/" + QLatin1String(pair.first), pair.second, data,
+                              entity.id + " : " + prefix + "Drive.Ata." + QLatin1String(pair.first), Format::Count);
                     }
+                    ataAttributes(entity, healthBudget);
                 } else {
                     copy("NVMe.Controller", "SmartCriticalWarning", QT_TRANSLATE_NOOP("Storage", "Cached NVMe critical warnings"), Format::NvmeHealth);
                     copy("NVMe.Controller", "SmartPowerOnHours", QT_TRANSLATE_NOOP("Storage", "Cached power-on time"), Format::Hours, true);
@@ -375,7 +437,7 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths)
                 field(entity.fields, "health", QT_TRANSLATE_NOOP("Storage", "Cached health"), {}, entity.id + " : " + prefix + iface + ".SmartUpdated (never updated or unavailable)");
             }
         } else if (interfaces.contains(prefix + "Drive")) {
-            field(entity.fields, "health", QT_TRANSLATE_NOOP("Storage", "Cached health"), {}, entity.id + " : UDisks2 (no supported health interface)");
+            field(entity.fields, "health", QT_TRANSLATE_NOOP("Storage", "Cached health"), {ReadState::Unsupported, {}, 0}, entity.id + " : UDisks2 (no supported ATA or NVMe health interface)");
         }
         for (auto iface = interfaces.cbegin(); iface != interfaces.cend(); ++iface) {
             for (const char *key : {"Drive", "CryptoBackingDevice", "MDRaid", "MDRaidMember", "Table", "LogicalVolume", "VolumeGroup"}) {
