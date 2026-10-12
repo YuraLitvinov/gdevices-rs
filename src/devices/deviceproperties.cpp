@@ -596,7 +596,11 @@ DeviceProperties collectDeviceProperties(const Device &device, bool cachedStorag
         // Desktop-session queries belong to explicit properties requests, not
         // deep search (which passes cachedStorageService=false).
         if (cachedStorageService && d.subsystem == "drm" && d.sysname.contains('-')
-            && !QThread::currentThread()->isInterruptionRequested()) result.display = collectDisplayProperties(d, readText(deviceFd.fd, "status"));
+            && !QThread::currentThread()->isInterruptionRequested()) {
+            result.monitor = collectMonitorProperties(deviceFd.fd, d.path);
+            if (!QThread::currentThread()->isInterruptionRequested())
+                result.display = collectDisplayProperties(d, readText(deviceFd.fd, "status"));
+        }
         // Binding can change during a read even if the device instance remains.
         const Attribute afterLink = linkTarget(deviceFd.fd, "driver");
         if (afterLink.state != driverLink.state || afterLink.value != driverLink.value || afterLink.error != driverLink.error) {

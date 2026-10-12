@@ -25,6 +25,10 @@ pkg_check_modules(UDEV REQUIRED IMPORTED_TARGET libudev)
 # Do not link PkgConfig targets for these backends into the executable.
 pkg_check_modules(DISPLAY_X11 REQUIRED xcb-randr)
 pkg_check_modules(DISPLAY_WAYLAND REQUIRED wayland-client>=1.20)
+option(DISPLAY_INFO "Use optional libdisplay-info for monitor EDID decoding" ON)
+if(DISPLAY_INFO)
+    pkg_check_modules(DISPLAY_INFO QUIET IMPORTED_TARGET libdisplay-info>=0.1.1)
+endif()
 option(KMOD "Use optional libkmod for function descriptions and installed module properties" ON)
 if(KMOD)
     pkg_check_modules(KMOD QUIET IMPORTED_TARGET libkmod>=30)
@@ -38,6 +42,7 @@ add_executable(qlinuxdevicemanager
     src/devices/networkproperties.h src/devices/networkproperties.cpp
     src/devices/ethernetproperties.h src/devices/ethernetproperties.cpp
     src/devices/displayproperties.h src/devices/displayproperties.cpp
+    src/devices/monitorproperties.h src/devices/monitorproperties.cpp
     src/devices/displaybackend.h src/devices/displayx11.cpp src/devices/displaywayland.cpp
     src/devices/storageproperties.h src/devices/storageproperties.cpp
     src/devices/directoryscan.h
@@ -76,6 +81,13 @@ target_include_directories(qlinuxdevicemanager PRIVATE
     src/devices src/ui "${CMAKE_CURRENT_BINARY_DIR}/generated"
     ${DISPLAY_X11_INCLUDE_DIRS} ${DISPLAY_WAYLAND_INCLUDE_DIRS})
 target_link_libraries(qlinuxdevicemanager PRIVATE Qt6::Widgets Qt6::Network PkgConfig::UDEV)
+if(DISPLAY_INFO AND TARGET PkgConfig::DISPLAY_INFO)
+    target_link_libraries(qlinuxdevicemanager PRIVATE PkgConfig::DISPLAY_INFO)
+    target_compile_definitions(qlinuxdevicemanager PRIVATE QLDM_HAVE_DISPLAY_INFO)
+    message(STATUS "Monitor EDID decoding: enabled (libdisplay-info)")
+else()
+    message(STATUS "Monitor EDID decoding: disabled; kernel mode names remain available")
+endif()
 if(KMOD AND TARGET PkgConfig::KMOD)
     target_link_libraries(qlinuxdevicemanager PRIVATE PkgConfig::KMOD)
     target_compile_definitions(qlinuxdevicemanager PRIVATE QLDM_HAVE_KMOD)
@@ -155,6 +167,7 @@ if(BUILD_TESTING)
         src/devices/networkproperties.cpp src/devices/networkproperties.h
         src/devices/ethernetproperties.cpp src/devices/ethernetproperties.h
         src/devices/displayproperties.cpp src/devices/displayproperties.h
+        src/devices/monitorproperties.cpp src/devices/monitorproperties.h
         src/devices/displaybackend.h src/devices/displayx11.cpp src/devices/displaywayland.cpp
         src/devices/storageproperties.cpp src/devices/storageproperties.h
         src/devices/storagepresentation.cpp src/devices/storagepresentation.h
@@ -170,6 +183,10 @@ if(BUILD_TESTING)
     target_include_directories(device-search-test PRIVATE src/devices src/ui
         ${DISPLAY_X11_INCLUDE_DIRS} ${DISPLAY_WAYLAND_INCLUDE_DIRS})
     target_link_libraries(device-search-test PRIVATE Qt6::Widgets PkgConfig::UDEV)
+    if(DISPLAY_INFO AND TARGET PkgConfig::DISPLAY_INFO)
+        target_link_libraries(device-search-test PRIVATE PkgConfig::DISPLAY_INFO)
+        target_compile_definitions(device-search-test PRIVATE QLDM_HAVE_DISPLAY_INFO)
+    endif()
     if(KMOD AND TARGET PkgConfig::KMOD)
         target_link_libraries(device-search-test PRIVATE PkgConfig::KMOD)
         target_compile_definitions(device-search-test PRIVATE QLDM_HAVE_KMOD)

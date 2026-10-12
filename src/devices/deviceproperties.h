@@ -5,6 +5,7 @@
 #include "storageproperties.h"
 #include "networkproperties.h"
 #include "displayproperties.h"
+#include "monitorproperties.h"
 #include <QByteArray>
 #include <QThread>
 
@@ -35,6 +36,7 @@ struct DeviceProperties {
     QVector<NetworkProperties> network;
     Attribute networkState;
     DisplayProperties display;
+    MonitorProperties monitor;
     UsbProperties usb;
     BatteryProperties battery;
     bool pcieApplicable = false; // Evidence from this PCI device's link attributes only.

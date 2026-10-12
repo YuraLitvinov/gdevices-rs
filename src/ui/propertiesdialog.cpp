@@ -164,8 +164,9 @@ PropertiesDialog::PropertiesDialog(const Device &device, QWidget *parent) : QDia
     displayPage_ = new QWidget(tabs);
     displayPage_->hide();
     auto *displayLayout = new QVBoxLayout(displayPage_);
-    auto *displayNotice = plainLabel(tr("ℹ️ Desktop display configuration snapshot"), displayPage_);
-    displayNotice->setToolTip(tr("Resolution and refresh rate describe the configured physical mode. "
+    auto *displayNotice = plainLabel(tr("ℹ️ Monitor hardware and display configuration snapshot"), displayPage_);
+    displayNotice->setToolTip(tr("Monitor information is reported by this connector’s cached EDID and kernel mode list; "
+        "it does not guarantee capabilities. Active settings are shown separately below. Resolution and refresh rate describe the configured physical mode. "
         "Desktop color depth is not the panel or link depth. Scale excludes Qt application scaling. "
         "Wayland scale derived from logical size may include rounding; integer scale is a fallback. "
         "Reload properties to refresh. Unmatched or ambiguous connector names remain unavailable."));
@@ -776,9 +777,63 @@ void PropertiesDialog::rebuildDisplay()
         form->addWidget(value, row, 1);
         copy.append(caption + ": " + text);
     };
+    const auto alignCaptions = [&] {
+        int captionWidth = 0;
+        for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
+        for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
+    };
+    const MonitorProperties &monitor = snapshot_.monitor;
+    if (monitor.applicable) {
+        const auto hardwareValue = [&](const QString &key) { return propertyReadValue(monitor.values.value(key)); };
+        const auto hardwareField = [&](QGridLayout *form, const QString &caption, const QString &key) {
+            field(form, caption, hardwareValue(key), monitor.sources.value(key));
+        };
+        auto *identity = group(tr("Monitor hardware (reported)"));
+        QString descriptorStatus;
+        if (monitor.descriptor.state == ReadState::Available) {
+            descriptorStatus = monitor.values.contains("warnings") ? tr("Decoded with conformance warnings") : tr("Decoded by libdisplay-info");
+        } else if (monitor.descriptor.state == ReadState::Unsupported && monitor.descriptor.value.isEmpty()) {
+            descriptorStatus = tr("EDID decoding unavailable: build with libdisplay-info support");
+        } else if (monitor.descriptor.state == ReadState::Unsupported) {
+            descriptorStatus = tr("Unsupported EDID version: %1").arg(monitor.descriptor.value);
+        } else if (monitor.descriptor.state == ReadState::Error && monitor.descriptor.error == EPROTO) {
+            descriptorStatus = tr("Malformed EDID (invalid header, length, checksum or parser rejection)");
+        } else if (monitor.descriptor.state == ReadState::Error && monitor.descriptor.error == EAGAIN) {
+            descriptorStatus = tr("Monitor report changed during collection; reload properties");
+        } else descriptorStatus = propertyReadValue(monitor.descriptor);
+        field(identity, tr("Descriptor"), descriptorStatus, monitor.sources.value("descriptor"));
+        if (monitor.values.contains("version")) hardwareField(identity, tr("EDID version"), "version");
+        if (monitor.descriptor.state == ReadState::Available) {
+            hardwareField(identity, tr("Manufacturer"), "manufacturer");
+            hardwareField(identity, tr("Manufacturer code"), "manufacturer_code");
+            hardwareField(identity, tr("Model"), "model");
+            hardwareField(identity, tr("Product code"), "product");
+            hardwareField(identity, tr("Serial number"), "serial");
+            const Attribute size = monitor.values.value("size");
+            const QStringList dimensions = size.value.split(' ');
+            field(identity, tr("Image dimensions"), size.state == ReadState::Available
+                ? tr("%1 × %2 cm").arg(dimensions.value(0), dimensions.value(1)) : propertyReadValue(size), monitor.sources.value("size"));
+            if (monitor.values.contains("warnings")) hardwareField(identity, tr("Conformance warnings"), "warnings");
+            auto *capabilities = group(tr("Monitor input (reported)"));
+            const Attribute digital = monitor.values.value("digital");
+            field(capabilities, tr("Signal type"), digital.state == ReadState::Available
+                ? (digital.value == "1" ? tr("Digital") : tr("Analog")) : propertyReadValue(digital), monitor.sources.value("digital"));
+            if (digital.state == ReadState::Available && digital.value == "1") {
+                hardwareField(capabilities, tr("Input interface"), "interface");
+                const Attribute depth = monitor.values.value("depth");
+                field(capabilities, tr("Declared color depth"), depth.state == ReadState::Available
+                    ? tr("%1 bits per color component").arg(depth.value) : propertyReadValue(depth), monitor.sources.value("depth"));
+            }
+        }
+        auto *reportedModes = group(tr("Kernel-reported modes"));
+        hardwareField(reportedModes, tr("Mode names"), "modes");
+        field(reportedModes, tr("Scope"), tr("Cached mode names; refresh rates are not exposed here. "
+            "The list may include driver additions or restrictions and does not guarantee monitor capabilities."), monitor.sources.value("modes"));
+    }
     if (data.status.state == ReadState::Available && data.status.value == "disconnected") {
         auto *session = group(tr("Desktop session"));
         field(session, tr("Configuration"), tr("Disconnected"), data.sources.value("configuration"));
+        alignCaptions();
         displayGroups_->addStretch();
         displayText_ = copy.join('\n');
         return;
@@ -816,7 +871,7 @@ void PropertiesDialog::rebuildDisplay()
         ? (data.status.value == "inactive" ? tr("No active mode") : tr("Reported by desktop server"))
         : propertyReadValue(data.status), tr("Read-only session query. Unavailable can mean missing runtime libraries, "
             "an output not exposed by this session, or a protocol without usable output names."));
-    auto *mode = group(tr("Display mode"));
+    auto *mode = group(tr("Active display mode"));
     field(mode, tr("Resolution"), formatted("resolution"), data.sources.value("resolution"));
     field(mode, tr("Desktop color depth"), formatted("depth"), data.sources.value("depth"));
     field(mode, tr("Refresh rate"), formatted("refresh"), data.sources.value("refresh"));
@@ -824,9 +879,7 @@ void PropertiesDialog::rebuildDisplay()
     field(transform, tr("Rotation"), formatted("rotation"), data.sources.value("rotation"));
     field(transform, tr("Reflection"), formatted("reflection"), data.sources.value("reflection"));
     field(transform, tr("Output scale"), formatted("scale"), data.sources.value("scale"));
-    int captionWidth = 0;
-    for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
-    for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
+    alignCaptions();
     displayGroups_->addStretch();
     displayText_ = copy.join('\n');
 }

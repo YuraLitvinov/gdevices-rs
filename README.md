@@ -139,7 +139,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | General | Name, category, manufacturer, bus/subsystem, location, observed status and selected hardware identifiers |
 | Driver | Direct driver binding, owning module, available running version and optional installed-module metadata |
 | Network | IPv4/IPv6 addresses and masks, MAC addresses, MTU, and Ethernet link speed, duplex, autonegotiation and modes |
-| Display | Desktop-session mode resolution, desktop color depth, nominal refresh rate, rotation/reflection and output scale |
+| Display | Reported monitor identity, dimensions and input capabilities, kernel mode names, plus desktop-session resolution, color depth, refresh rate, rotation/reflection and scale |
 | PCIe | Current link speed/width, reported device maximum speed/width, and connection type when running as root |
 | Battery | Reported capacities, estimated retention, cycle count, chemistry, voltage, percentage, status, current and power |
 | USB | USB version, connection speed, active configuration, declared power/current, remote wakeup capability and interface functions/drivers |
@@ -266,7 +266,33 @@ kernel. Declared firmware filenames do not establish which firmware is loaded or
 its version; directly reported firmware revisions are shown where available.
 
 The **Display** tab is available on DRM output connectors and uses grouped
-label/value sections like Network. Native X11/RandR and Wayland queries run in the
+label/value sections like Network.
+Monitor hardware appears above the active desktop configuration, using the exact
+selected connector's cached `edid` and `modes` sysfs files. Optional
+**libdisplay-info >= 0.1.1** decodes reported manufacturer/model, product code,
+serial, image dimensions and digital input type/color depth. No EDID decoder is
+bundled: without this library, decoding is explicitly unsupported while kernel
+mode names and desktop settings remain available. Configure with
+`-DDISPLAY_INFO=OFF` to disable it; CMake reports whether decoding is enabled.
+
+Reads run only in the properties worker on demand, never force connector detection,
+change settings or poll in the background. EDID is limited to 32 KiB and mode
+text to 64 KiB / 2048 entries. Header, declared length and all block checksums
+must pass before parsing. Unsupported EDID versions, corrupt framing, permission
+failures and missing data remain distinct. Parser conformance warnings are shown
+with decoded reports, rather than claiming that imperfect EDID is fully valid.
+Connection status and EDID are reread to detect changes during collection; reload
+if the report changed. Disconnected kernel connectors do not expose stale EDID.
+
+Image dimensions are the reported image area, not enclosure dimensions; absent
+or aspect-ratio-only measurements remain unavailable. Declared color depth is
+separate from active desktop depth. EDID can be overridden or supplied by an
+adapter/KVM, so identity and capabilities are reported claims. Kernel mode names
+are deduplicated and may reflect driver additions/restrictions: they are not a
+complete EDID timing catalog, do not distinguish refresh rates, and do not imply
+that a mode is guaranteed to work. The existing display copy button includes
+hardware headings and labels, and **Reload properties** refreshes both snapshots.
+ Native X11/RandR and Wayland queries run in the
 properties worker; `libxcb.so.1`, `libxcb-randr.so.0` and `libwayland-client.so.0`
 are loaded on demand, without linking the application to either session API.
 The selected Wayland session is queried directly even when the application runs
@@ -291,11 +317,11 @@ multi-GPU names and unnamed/unmatched outputs remain unavailable rather than
 borrowing another display's settings. Older Wayland compositors need xdg-output
 v2 for names; otherwise wl_output v4 names are used. X11 queries cover the default
 X screen. Missing libraries or protocol support leave the hardware view usable.
-Disconnected connectors show only **Configuration: Disconnected**, based on a
+Disconnected session outputs show **Configuration: Disconnected**, based on a
 fresh DRM status read or an explicit X11 output connection status. Connected
 outputs without a mode retain **No active mode**. Zero rotation is shown as
 **0°**; nonzero angles retain their counterclockwise direction.
-Use **Reload properties** to refresh the desktop configuration snapshot.
+Use **Reload properties** to refresh the monitor and desktop configuration snapshot.
 
 The **USB** tab appears only on USB device nodes (including hubs), with grouped
 label/value sections and a copy button. Its first **Connection** section shows the
@@ -424,7 +450,7 @@ chmod +x QLinuxDeviceManager-*.AppImage
 ```
 
 The package includes Qt 6.8, X11/Wayland platform plugins, application icons and
-translations, and enables libkmod and QtDBus support. It is built on Ubuntu 24.04;
+translations, and enables libkmod, QtDBus and libdisplay-info monitor decoding. It is built on Ubuntu 24.04;
 older distributions are not guaranteed to be compatible. The host still provides
 the Linux kernel, device metadata and optional UDisks2 service.
 
@@ -443,22 +469,25 @@ Requirements:
   libraries are required only for the corresponding Display backend).
 - Optional QtDBus **6.8 or newer** for cached UDisks2 storage metadata.
 - Optional libkmod **30 or newer** for installed-module metadata and fallback names.
+- Optional libdisplay-info **0.1.1 or newer** for monitor EDID decoding.
 - Optional Qt Linguist tools **6.8 or newer** to build translation catalogs.
 
 Fedora packages:
 
 ```sh
+# Optional monitor EDID decoding: libdisplay-info-devel
 sudo dnf install gcc-c++ cmake make pkgconf-pkg-config qt6-qtbase-devel systemd-devel libxcb-devel wayland-devel
 # Optional:
-sudo dnf install qt6-qttools-devel kmod-devel
+sudo dnf install qt6-qttools-devel kmod-devel libdisplay-info-devel
 ```
 
 Debian/Ubuntu packages:
 
 ```sh
+# Optional monitor EDID decoding: libdisplay-info-dev (>= 0.1.1)
 sudo apt install g++ cmake make pkg-config qt6-base-dev libudev-dev libxcb-randr0-dev libwayland-dev
 # Optional:
-sudo apt install qt6-tools-dev qt6-tools-dev-tools libkmod-dev
+sudo apt install qt6-tools-dev qt6-tools-dev-tools libkmod-dev libdisplay-info-dev
 ```
 
 Check that your distribution's Qt packages meet the minimum version; older
