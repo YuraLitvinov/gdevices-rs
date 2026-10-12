@@ -18,7 +18,10 @@ signals:
 private:
     QString displayValue(const QString &key, const Attribute &value) const;
     void rebuildMok();
+    void rebuildMemory();
+    QString memoryValue(const QString &key, const Attribute &value) const;
     void copyAll();
+    QGridLayout *memoryForm_ = nullptr;
     QGridLayout *mokForm_ = nullptr;
     QHash<QString, QLabel *> fields_;
     QStringList order_;

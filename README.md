@@ -434,6 +434,29 @@ values are valid, their difference is shown as system-reserved RAM, covering all
 memory unavailable to Linux rather than only firmware reservations. Missing
 capacity is left unavailable instead of guessed.
 
+**Memory devices (firmware-reported)** appears below those totals in System
+Information. Each cached udev `dmi/id` record shows capacity, explicit presence
+when supplied, device/bank locators, type, form factor, rated/configured transfer
+rates in MT/s, manufacturer and part number. Volatile and nonvolatile capacities
+remain separate when reported. The same cache snapshot supplies the existing
+Physical RAM calculation; its interpretation is unchanged.
+
+These are firmware records, not proof of removable modules or physical slots.
+Soldered memory and virtual machines may expose several records; duplicate or
+missing locators do not merge them. Rates are firmware declarations, not live
+measurements. Channels, upgradeability and active ECC are not inferred. Missing
+presence does not mean absent, missing capacity does not mean zero, and unknown
+or placeholder metadata remains unavailable. Inconsistent or malformed numeric
+values retain explicit errors. No raw SMBIOS, SPD/SMBus probing, subprocess,
+privilege escalation or extra dependency is used. A missing cache does not imply
+that running as root will help.
+
+Collection supports cancellation and bounds strings to 256 bytes, metadata to
+1 MiB and detailed records to 256; exceeding a bound publishes an explicit error
+instead of a truncated list. Installed-RAM totals retain their existing 4096-record
+limit. Optional metadata failures do not invalidate a collected RAM total.
+**Refresh**, source tooltips and **Copy all** include the memory records and labels.
+
 CPU topology and virtualization information reflect what the running environment
 exposes. A container or virtual machine may report a restricted or virtual system
 view; absent virtualization evidence does not prove physical hardware. CPU cache

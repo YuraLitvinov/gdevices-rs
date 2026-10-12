@@ -63,36 +63,62 @@ bool unsignedDecimal(const QString &text, qulonglong &value)
     value = text.toULongLong(&ok);
     return ok;
 }
-Attribute installedMemory()
+constexpr int maxMemoryDevices = 4096;
+constexpr int maxDetailedMemoryDevices = 256;
+constexpr int maxMemoryString = 256;
+constexpr int maxMemoryBytes = 1024 * 1024;
+const char *const memorySuffixes[] = {
+    "SIZE", "PRESENT", "NON_VOLATILE_SIZE", "VOLATILE_SIZE", "LOCATOR", "BANK_LOCATOR",
+    "TYPE", "FORM_FACTOR", "SPEED_MTS", "CONFIGURED_SPEED_MTS", "MANUFACTURER", "PART_NUMBER"
+};
+void installedMemory(SystemProperties &result)
 {
+    const auto failure = [&](const Attribute &status) {
+        result.values["physical_memory"] = status;
+        result.memoryDevices.status = status;
+    };
     std::unique_ptr<udev, decltype(&udev_unref)> context(udev_new(), &udev_unref);
-    if (!context) return failed(ENOMEM);
+    if (!context) { failure(failed(ENOMEM)); return; }
     errno = 0;
     std::unique_ptr<udev_device, decltype(&udev_device_unref)> device(
         udev_device_new_from_subsystem_sysname(context.get(), "dmi", "id"), &udev_device_unref);
-    if (!device) return errno ? failed(errno) : Attribute();
+    if (!device) { failure(errno ? failed(errno) : Attribute()); return; }
     QHash<QString, QString> properties;
-    const auto copy = [&](const QString &key) {
+    int copiedBytes = 0;
+    const auto copy = [&](const QString &key, int limit = maxMemoryString) {
         const char *raw = udev_device_get_property_value(device.get(), key.toUtf8().constData());
         if (!raw) return true;
-        const size_t length = strnlen(raw, 65);
-        if (length > 64) return false;
+        const size_t length = strnlen(raw, static_cast<size_t>(limit + 1));
+        if (length > static_cast<size_t>(limit) || copiedBytes > maxMemoryBytes - static_cast<int>(length)) return false;
+        copiedBytes += static_cast<int>(length);
         properties.insert(key, QString::fromUtf8(raw, static_cast<int>(length)));
         return true;
     };
     const QString countKey = "MEMORY_ARRAY_NUM_DEVICES";
-    if (!copy(countKey)) return failed(EOVERFLOW);
+    if (!copy(countKey, 64)) { failure(failed(EOVERFLOW)); return; }
     qulonglong count = 0;
-    if (!properties.contains(countKey)) return {};
-    if (!unsignedDecimal(properties.value(countKey), count)) return failed(EINVAL);
-    if (count > 4096) return failed(EOVERFLOW);
-    for (qulonglong slot = 0; slot < count; ++slot) {
-        if (QThread::currentThread()->isInterruptionRequested()) return failed(ECANCELED);
-        const QString prefix = QStringLiteral("MEMORY_DEVICE_%1_").arg(slot);
+    if (!properties.contains(countKey)) return;
+    if (!unsignedDecimal(properties.value(countKey), count)) { failure(failed(EINVAL)); return; }
+    if (count > maxMemoryDevices) { failure(failed(EOVERFLOW)); return; }
+    // Capacity and metadata share one owned udev database snapshot. Optional
+    // metadata bounds must not invalidate the existing installed-RAM calculation.
+    for (qulonglong index = 0; index < count; ++index) {
+        if (QThread::currentThread()->isInterruptionRequested()) { failure(failed(ECANCELED)); return; }
+        const QString prefix = QStringLiteral("MEMORY_DEVICE_%1_").arg(index);
         for (const char *suffix : {"SIZE", "PRESENT", "NON_VOLATILE_SIZE"})
-            if (!copy(prefix + QLatin1String(suffix))) return failed(EOVERFLOW);
+            if (!copy(prefix + QLatin1String(suffix), 64)) { failure(failed(EOVERFLOW)); return; }
     }
-    return parseInstalledMemory(properties);
+    result.values["physical_memory"] = parseInstalledMemory(properties);
+    if (count > maxDetailedMemoryDevices) { result.memoryDevices.status = failed(EOVERFLOW); return; }
+    for (qulonglong index = 0; index < count; ++index) {
+        if (QThread::currentThread()->isInterruptionRequested()) { result.memoryDevices.status = failed(ECANCELED); return; }
+        const QString prefix = QStringLiteral("MEMORY_DEVICE_%1_").arg(index);
+        for (const char *suffix : memorySuffixes) {
+            const QString key = prefix + QLatin1String(suffix);
+            if (!properties.contains(key) && !copy(key)) { result.memoryDevices.status = failed(EOVERFLOW); return; }
+        }
+    }
+    result.memoryDevices = parseMemoryDevices(properties);
 }
 void cpuTopology(SystemProperties &result)
 {
@@ -287,6 +313,70 @@ Attribute parseInstalledMemory(const QHash<QString, QString> &properties)
     }
     return total ? available(QString::number(total)) : Attribute();
 }
+FirmwareMemoryInformation parseMemoryDevices(const QHash<QString, QString> &properties)
+{
+    FirmwareMemoryInformation result;
+    const QString countKey = "MEMORY_ARRAY_NUM_DEVICES";
+    if (!properties.contains(countKey)) return result;
+    qulonglong count = 0;
+    if (!unsignedDecimal(properties.value(countKey), count)) { result.status = failed(EINVAL); return result; }
+    if (count > maxDetailedMemoryDevices) { result.status = failed(EOVERFLOW); return result; }
+    int bytes = 0;
+    const auto numeric = [](const QString &key) {
+        return key == "SIZE" || key == "VOLATILE_SIZE" || key == "NON_VOLATILE_SIZE"
+            || key == "SPEED_MTS" || key == "CONFIGURED_SPEED_MTS";
+    };
+    const QStringList placeholders = {"unknown", "not specified", "not provided", "none",
+        "to be filled by o.e.m.", "default string"};
+    for (qulonglong index = 0; index < count; ++index) {
+        if (QThread::currentThread()->isInterruptionRequested()) {
+            result.devices.clear(); result.status = failed(ECANCELED); return result;
+        }
+        FirmwareMemoryDevice record;
+        record.index = static_cast<int>(index);
+        const QString prefix = QStringLiteral("MEMORY_DEVICE_%1_").arg(index);
+        for (const char *suffix : memorySuffixes) {
+            const QString key = QLatin1String(suffix);
+            const QString raw = properties.value(prefix + key);
+            const qsizetype byteSize = raw.toUtf8().size();
+            if (byteSize > maxMemoryString || bytes > maxMemoryBytes - byteSize) {
+                result.devices.clear(); result.status = failed(EOVERFLOW); return result;
+            }
+            bytes += static_cast<int>(byteSize);
+            const QString text = raw.trimmed();
+            Attribute value;
+            if (!text.isEmpty() && !placeholders.contains(text.toLower())) {
+                value = available(text);
+                qulonglong amount = 0;
+                if (key == "PRESENT") {
+                    if (text != "0" && text != "1") value = failed(EINVAL);
+                } else if (numeric(key)) {
+                    if (!unsignedDecimal(text, amount)) value = failed(EINVAL);
+                    else if (!amount && (key == "SPEED_MTS" || key == "CONFIGURED_SPEED_MTS")) value = {};
+                }
+            }
+            record.values.insert(key, value);
+        }
+        const Attribute present = record.values.value("PRESENT");
+        if (present.state == ReadState::Available && present.value == "0") {
+            for (const char *suffix : {"SIZE", "VOLATILE_SIZE", "NON_VOLATILE_SIZE"}) {
+                Attribute &capacity = record.values[QLatin1String(suffix)];
+                if (capacity.state == ReadState::Error
+                    || (capacity.state == ReadState::Available && capacity.value.toULongLong() != 0)) {
+                    capacity = failed(EINVAL);
+                    record.values["PRESENT"] = failed(EINVAL);
+                } else capacity = {ReadState::NotApplicable, {}, 0};
+            }
+        } else {
+            // A zero total capacity does not establish an empty device.
+            Attribute &capacity = record.values["SIZE"];
+            if (capacity.state == ReadState::Available && capacity.value.toULongLong() == 0) capacity = {};
+        }
+        result.devices.append(std::move(record));
+    }
+    result.status = available(QString::number(count));
+    return result;
+}
 SystemProperties collectSystemProperties()
 {
     SystemProperties result;
@@ -313,8 +403,9 @@ SystemProperties collectSystemProperties()
     models.removeDuplicates(); models.sort(Qt::CaseInsensitive);
     put("cpu", cpu.state == ReadState::Available ? models.isEmpty() ? Attribute() : available(models.join('\n')) : cpu, "/proc/cpuinfo: per-processor model fields");
     cpuTopology(result);
-    put("physical_memory", installedMemory(),
-        "libudev: dmi/id MEMORY_ARRAY_NUM_DEVICES and MEMORY_DEVICE_n_SIZE/PRESENT; firmware-reported installed RAM");
+    installedMemory(result);
+    result.sources["physical_memory"] = "libudev: dmi/id MEMORY_ARRAY_NUM_DEVICES and MEMORY_DEVICE_n_SIZE/PRESENT; firmware-reported installed RAM";
+    result.sources["memory_devices"] = "libudev: dmi/id cached MEMORY_ARRAY_NUM_DEVICES and MEMORY_DEVICE_n_* properties";
     const Attribute memory = readText("/proc/meminfo", 65536);
     Attribute total = memory.state == ReadState::Available ? Attribute() : memory;
     for (const QString &line : memory.value.split('\n')) {

@@ -53,6 +53,50 @@ int main(int argc, char **argv)
     memory["MEMORY_ARRAY_NUM_DEVICES"] = "4097";
     check(parseInstalledMemory(memory).error == EOVERFLOW, "Memory slot count is bounded");
     check(parseInstalledMemory({}).state == ReadState::Unavailable, "Missing firmware data is not zero RAM");
+    QHash<QString, QString> records {
+        {"MEMORY_ARRAY_NUM_DEVICES", "3"}, {"MEMORY_DEVICE_0_SIZE", "17179869184"},
+        {"MEMORY_DEVICE_0_LOCATOR", "Same locator"}, {"MEMORY_DEVICE_1_LOCATOR", "Same locator"},
+        {"MEMORY_DEVICE_0_TYPE", "LPDDR5"}, {"MEMORY_DEVICE_0_SPEED_MTS", "8533"},
+        {"MEMORY_DEVICE_0_CONFIGURED_SPEED_MTS", "0"}, {"MEMORY_DEVICE_0_PART_NUMBER", "Unknown"},
+        {"MEMORY_DEVICE_1_SIZE", "Unknown"}, {"MEMORY_DEVICE_2_PRESENT", "0"}
+    };
+    auto details = parseMemoryDevices(records);
+    check(details.status.state == ReadState::Available && details.devices.size() == 3,
+          "Keep populated, unknown and explicitly empty firmware records separate");
+    check(details.devices[0].values.value("PRESENT").state == ReadState::Unavailable
+          && details.devices[0].values.value("SIZE").value == "17179869184",
+          "Missing presence flag does not discard known capacity");
+    check(details.devices[0].values.value("LOCATOR").value == details.devices[1].values.value("LOCATOR").value,
+          "Duplicate locators do not merge records");
+    check(details.devices[1].values.value("SIZE").state == ReadState::Unavailable
+          && details.devices[2].values.value("SIZE").state == ReadState::NotApplicable,
+          "Unknown capacity differs from explicitly empty device");
+    check(details.devices[0].values.value("SPEED_MTS").value == "8533"
+          && details.devices[0].values.value("CONFIGURED_SPEED_MTS").state == ReadState::Unavailable
+          && details.devices[0].values.value("PART_NUMBER").state == ReadState::Unavailable,
+          "MT/s remains numeric; zero rate and firmware placeholders remain unavailable");
+    records["MEMORY_DEVICE_0_NON_VOLATILE_SIZE"] = "1073741824";
+    records["MEMORY_DEVICE_0_VOLATILE_SIZE"] = "16106127360";
+    records["MEMORY_DEVICE_1_SPEED_MTS"] = "bad";
+    records["MEMORY_DEVICE_2_SIZE"] = "1024";
+    details = parseMemoryDevices(records);
+    check(details.devices[0].values.value("NON_VOLATILE_SIZE").value == "1073741824"
+          && details.devices[0].values.value("VOLATILE_SIZE").value == "16106127360",
+          "Volatile and persistent capacities remain separate");
+    check(details.devices[1].values.value("SPEED_MTS").error == EINVAL
+          && details.devices[2].values.value("SIZE").error == EINVAL
+          && details.devices[2].values.value("PRESENT").error == EINVAL,
+          "Malformed numeric values and contradictory empty records are explicit errors");
+    records["MEMORY_DEVICE_0_MANUFACTURER"] = QString(257, 'x');
+    check(parseMemoryDevices(records).status.error == EOVERFLOW
+          && parseMemoryDevices(records).devices.isEmpty(), "Oversized metadata publishes no partial record list");
+    records.remove("MEMORY_DEVICE_0_MANUFACTURER");
+    records["MEMORY_ARRAY_NUM_DEVICES"] = "257";
+    check(parseMemoryDevices(records).status.error == EOVERFLOW, "Detailed record expansion is bounded");
+    check(parseMemoryDevices({}).status.state == ReadState::Unavailable, "Missing cache is not a permission failure");
+    records = {{"MEMORY_ARRAY_NUM_DEVICES", "0"}};
+    check(parseMemoryDevices(records).status.state == ReadState::Available
+          && parseMemoryDevices(records).devices.isEmpty(), "Explicit zero record count is distinct from missing cache");
     check(parseSecureBoot(QByteArray(1, char(1))).value == "enabled", "SecureBoot byte enables firmware state");
     check(parseSecureBoot(QByteArray(1, char(0))).value == "disabled", "SecureBoot zero disables firmware state");
     check(parseSecureBoot({}).state == ReadState::Error
