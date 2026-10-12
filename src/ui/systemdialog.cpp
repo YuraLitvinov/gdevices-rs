@@ -81,9 +81,11 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
         const int row = form->count() ? form->rowCount() : 0;
         form->addWidget(name, row, 0, Qt::AlignLeading | Qt::AlignTop);
         form->addWidget(value, row, 1);
-        fields_.insert(key, value);
-        captions_.insert(key, caption);
-        order_.append(key);
+        if (!fields_.contains(key)) {
+            captions_.insert(key, caption);
+            order_.append(key);
+        }
+        fields_[key].append(value);
     };
     auto *os = group(tr("System"));
     field(os, "manufacturer", tr("System manufacturer"));
@@ -100,6 +102,7 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(os, "kernel", tr("Kernel version"));
     field(os, "build", tr("Kernel build"));
     field(os, "boot", tr("Boot mode"));
+    field(os, "secure_boot", tr("Secure Boot"));
     field(os, "virtualization", tr("Virtualization environment"));
     field(os, "uptime", tr("Uptime"));
     field(os, "gpu_rebar", tr("Resizable BAR (GPU)"));
@@ -421,7 +424,7 @@ void SystemDialog::acceptResult(SystemProperties result)
     snapshot_ = std::move(result);
     for (const QString &key : order_) {
         if (key == "mok" || key == "memory_devices") continue; // Variable-length sections are rebuilt separately.
-        fields_.value(key)->setText(displayValue(key, snapshot_.values.value(key)));
+        const QString text = displayValue(key, snapshot_.values.value(key));
         QString source = snapshot_.sources.value(key);
         if (key == "secure_boot")
             source += '\n' + tr("Firmware SecureBoot state; does not establish shim validation or kernel lockdown policy.");
@@ -437,7 +440,11 @@ void SystemDialog::acceptResult(SystemProperties result)
             source += '\n' + tr("System reserved is reported physical RAM minus Linux MemTotal. "
                                  "It includes all memory unavailable to Linux, not just firmware reservations. "
                                  "It is omitted if physical capacity is unavailable or smaller than usable RAM.");
-        fields_.value(key)->setToolTip("<qt>" + source.toHtmlEscaped().replace('\n', "<br>") + "</qt>");
+        const QString hint = "<qt>" + source.toHtmlEscaped().replace('\n', "<br>") + "</qt>";
+        for (QLabel *value : fields_.value(key)) {
+            value->setText(text);
+            value->setToolTip(hint);
+        }
     }
     rebuildMok();
     rebuildMemory();

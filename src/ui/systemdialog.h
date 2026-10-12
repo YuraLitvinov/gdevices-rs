@@ -3,6 +3,7 @@
 #include <QDialog>
 #include <QHash>
 #include <QStringList>
+#include <QVector>
 class QGridLayout;
 class QLabel;
 class QPushButton;
@@ -23,7 +24,7 @@ private:
     void copyAll();
     QGridLayout *memoryForm_ = nullptr;
     QGridLayout *mokForm_ = nullptr;
-    QHash<QString, QLabel *> fields_;
+    QHash<QString, QVector<QLabel *>> fields_;
     QStringList order_;
     QHash<QString, QString> captions_;
     SystemProperties snapshot_;

@@ -464,7 +464,10 @@ presented as scrollable tabs: **System**, **BIOS/UEFI**, **Processor**, and
 **RAM/Memory**. The System tab starts with system manufacturer/model and motherboard
 manufacturer/model, followed by a horizontal separator and the remaining system
 fields. The BIOS/UEFI tab shows firmware version/date, then Secure Boot status
-and MOK certificate groups. Refresh and Copy all cover every tab.
+and MOK certificate groups. Secure Boot status also appears directly below Boot
+mode on System. Both labels use the same snapshot and source tooltip; Refresh
+updates both, and Copy all includes the value once. Refresh and Copy all cover
+every tab.
 
 The **System** tab includes **Resizable BAR (GPU)** for PCI display controllers.
 It separates kernel-exposed capability (**Supported** or **Not exposed by kernel**),
