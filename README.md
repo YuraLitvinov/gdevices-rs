@@ -330,7 +330,10 @@ Use **Reload properties** to refresh the monitor and desktop configuration snaps
 
 The **Camera** tab appears on V4L2 image-capture nodes. Driver/card/bus
 information uses grouped fields; a mode table keeps capture queue, pixel format,
-resolution and frame intervals together. Single-plane and multi-plane capture
+resolution and frame intervals together. The table shows all rows vertically,
+scrolling with the Properties page; column headings and cells wrap to the
+available width and are remeasured when resized or the theme/font changes.
+Single-plane and multi-plane capture
 are kept separate. Metadata-only, radio/output and memory-to-memory codec nodes
 are excluded after capability detection; if access fails, a video node retains
 the tab to explain the permission, busy, removed or unsupported query state.

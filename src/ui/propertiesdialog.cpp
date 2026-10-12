@@ -22,6 +22,11 @@
 #include <QLabel>
 #include <QLocale>
 #include <QPlainTextEdit>
+#include <QPainter>
+#include <QResizeEvent>
+#include <QStyle>
+#include <QStyleOptionHeader>
+#include <QTimer>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
@@ -35,6 +40,87 @@
 #include <utility>
 
 namespace {
+// Camera modes scroll with the Properties page, not inside a short nested view.
+class CameraModeHeader final : public QHeaderView {
+public:
+    explicit CameraModeHeader(QWidget *parent) : QHeaderView(Qt::Horizontal, parent) {}
+    int wrappedHeight() const
+    {
+        int height = 0;
+        for (int index = 0; index < count(); ++index) {
+            if (isSectionHidden(index)) continue;
+            QStyleOptionHeaderV2 option;
+            initStyleOption(&option);
+            initStyleOptionForIndex(&option, index);
+            const int baseHeight = QHeaderView::sectionSizeFromContents(index).height();
+            option.rect = QRect(0, 0, sectionSize(index), baseHeight);
+            const QRect label = style()->subElementRect(QStyle::SE_HeaderLabel, &option, this);
+            const QRect wrapped = fontMetrics().boundingRect(QRect(0, 0, qMax(1, label.width()), QWIDGETSIZE_MAX),
+                Qt::AlignCenter | Qt::TextWordWrap, option.text);
+            height = qMax(height, qMax(baseHeight, wrapped.height() + baseHeight - label.height()));
+        }
+        return height;
+    }
+protected:
+    void paintSection(QPainter *painter, const QRect &rect, int index) const override
+    {
+        if (!rect.isValid()) return;
+        QStyleOptionHeaderV2 option;
+        initStyleOption(&option);
+        initStyleOptionForIndex(&option, index);
+        option.rect = rect;
+        const QString text = option.text;
+        const QRect label = style()->subElementRect(QStyle::SE_HeaderLabel, &option, this);
+        option.text.clear();
+        painter->save();
+        style()->drawControl(QStyle::CE_Header, &option, painter, this);
+        painter->setFont(font());
+        style()->drawItemText(painter, label, Qt::AlignCenter | Qt::TextWordWrap,
+            option.palette, option.state.testFlag(QStyle::State_Enabled), text, QPalette::ButtonText);
+        painter->restore();
+    }
+};
+class CameraModeTable final : public QTableWidget {
+public:
+    CameraModeTable(int rows, int columns, QWidget *parent) : QTableWidget(rows, columns, parent)
+    {
+        setHorizontalHeader(new CameraModeHeader(this));
+        setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        connect(horizontalHeader(), &QHeaderView::sectionResized, this, [this] { fitContents(); });
+    }
+    void fitContents()
+    {
+        if (fitQueued_) return;
+        fitQueued_ = true;
+        // Let the stretched columns settle before measuring wrapped text.
+        QTimer::singleShot(0, this, [this] {
+            fitQueued_ = false;
+            auto *header = static_cast<CameraModeHeader *>(horizontalHeader());
+            const int headerHeight = header->wrappedHeight();
+            if (header->height() != headerHeight) header->setFixedHeight(headerHeight);
+            resizeRowsToContents();
+            const int height = verticalHeader()->length() + headerHeight + 2 * frameWidth();
+            if (minimumHeight() != height || maximumHeight() != height) setFixedHeight(height);
+        });
+    }
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QTableWidget::resizeEvent(event);
+        fitContents();
+    }
+    void changeEvent(QEvent *event) override
+    {
+        QTableWidget::changeEvent(event);
+        if (event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange
+            || event->type() == QEvent::LayoutDirectionChange) fitContents();
+    }
+private:
+    bool fitQueued_ = false;
+};
+
 QString eventDescription(const DeviceEvent &event)
 {
     if (event.action == "add") return QCoreApplication::translate("PropertiesDialog", "Device addition observed");
@@ -821,7 +907,7 @@ void PropertiesDialog::rebuildCamera()
         const QString title = tr("Format, size and frame rate combinations");
         auto *box = new QGroupBox(title, cameraGroups_->parentWidget());
         auto *layout = new QVBoxLayout(box);
-        auto *table = new QTableWidget(modes.size(), 4, box);
+        auto *table = new CameraModeTable(static_cast<int>(modes.size()), 4, box);
         const QStringList headers {tr("Capture queue"), tr("Pixel format"), tr("Resolution / range"), tr("Frame rates / intervals")};
         table->setHorizontalHeaderLabels(headers);
         table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -829,7 +915,6 @@ void PropertiesDialog::rebuildCamera()
         table->setWordWrap(true);
         table->verticalHeader()->hide();
         table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-        table->setMinimumHeight(240);
         layout->addWidget(table); cameraGroups_->addWidget(box);
         copy.append(QString()); copy.append(title);
         const auto fractionText = [](const QJsonArray &f) { return QString::number(f.at(0).toInteger()) + '/' + QString::number(f.at(1).toInteger()); };
@@ -887,7 +972,7 @@ void PropertiesDialog::rebuildCamera()
                 copy.append(headers.at(column) + ": " + values.at(column));
             }
         }
-        table->resizeRowsToContents();
+        table->fitContents();
     }
     cameraGroups_->addStretch();
     cameraText_ = copy.join('\n');
