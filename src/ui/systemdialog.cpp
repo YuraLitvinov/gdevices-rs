@@ -95,14 +95,11 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     auto *secureBoot = group(tr("Secure Boot"));
     field(secureBoot, "secure_boot", tr("Status"));
     captions_.insert("secure_boot", tr("Secure Boot"));
-    auto *mokTitle = new QLabel(tr("MOK certificates"), secureBoot->parentWidget());
-    mokTitle->setTextFormat(Qt::PlainText);
-    secureBoot->addWidget(mokTitle, 1, 0, 1, 2);
     auto *mokPage = new QWidget(secureBoot->parentWidget());
     mokForm_ = new QGridLayout(mokPage);
     mokForm_->setContentsMargins(0, 0, 0, 0);
     mokForm_->setColumnStretch(1, 1);
-    secureBoot->addWidget(mokPage, 2, 0, 1, 2);
+    secureBoot->addWidget(mokPage, 1, 0, 1, 2);
     order_.append("mok");
     captions_.insert("mok", tr("MOK certificates"));
     auto *hardware = group(tr("Hardware and firmware"));
@@ -336,7 +333,9 @@ void SystemDialog::rebuildMok()
     const auto known = [this](const QString &text) { return text.isEmpty() ? tr("Unavailable") : text; };
     int index = 0;
     for (const MokCertificate &certificate : mok.certificates) {
-        auto *box = new QGroupBox(tr("Certificate %1").arg(++index), mokForm_->parentWidget());
+        const QString title = mok.certificates.size() == 1 ? tr("MOK Certificate")
+            : tr("MOK Certificate %1").arg(++index);
+        auto *box = new QGroupBox(title, mokForm_->parentWidget());
         auto *form = new QGridLayout(box);
         form->setColumnStretch(1, 1);
         form->setColumnMinimumWidth(0, mokForm_->columnMinimumWidth(0));
