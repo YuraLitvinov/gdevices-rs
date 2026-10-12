@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QThread>
 #include <libudev.h>
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <limits>
@@ -40,6 +41,9 @@ namespace {
 constexpr int recordLimit = 4096;
 constexpr int relatedLimit = 256;
 constexpr int textLimit = 4096;
+#ifdef QLDM_HAVE_DBUS
+constexpr int healthQueryBudgetMs = 2500;
+#endif
 using Format = StorageField::Format;
 Attribute ok(const QString &text) { return {ReadState::Available, text, 0}; }
 Attribute failure(int error)
@@ -158,20 +162,22 @@ void serviceField(StorageEntity &entity, const QVariantMap &properties, const QS
 QDBusMessage healthReply(const QString &path, const QString &iface, QElapsedTimer &budget, Attribute &state)
 {
     const auto fail = [&](const Attribute &error) { state = error; return QDBusMessage(); };
-    const int remaining = 2500 - static_cast<int>(budget.elapsed());
     if (QThread::currentThread()->isInterruptionRequested()) return fail(failure(ECANCELED));
-    if (remaining <= 0) return fail(failure(ETIMEDOUT));
+    if (!budget.isValid()) budget.start(); // Begin at the first detailed health query.
+    const qint64 remaining = healthQueryBudgetMs - budget.elapsed();
+    // Unavailable + ETIMEDOUT on HealthQueryStatus means no request was sent.
+    if (remaining <= 0) return fail({ReadState::Unavailable, {}, ETIMEDOUT});
     auto message = QDBusMessage::createMethodCall("org.freedesktop.UDisks2", path, iface, "SmartGetAttributes");
     message.setAutoStartService(false);
     message.setInteractiveAuthorizationAllowed(false);
     message << QVariant::fromValue(QVariantMap());
-    QDBusPendingCallWatcher watcher(QDBusConnection::systemBus().asyncCall(message, remaining));
+    QDBusPendingCallWatcher watcher(QDBusConnection::systemBus().asyncCall(message, static_cast<int>(remaining)));
     QEventLoop loop;
     QTimer cancellation;
     cancellation.setInterval(50);
     QObject::connect(&watcher, &QDBusPendingCallWatcher::finished, &loop, &QEventLoop::quit);
     QObject::connect(&cancellation, &QTimer::timeout, &loop, [&] {
-        if (QThread::currentThread()->isInterruptionRequested() || budget.elapsed() >= 2500) loop.quit();
+        if (QThread::currentThread()->isInterruptionRequested() || budget.elapsed() >= healthQueryBudgetMs) loop.quit();
     });
     cancellation.start();
     if (!watcher.isFinished()) loop.exec();
@@ -197,7 +203,7 @@ void nvmeAttributes(StorageEntity &entity, QElapsedTimer &budget)
     const QString iface = QStringLiteral("org.freedesktop.UDisks2.NVMe.Controller");
     const QString source = entity.id + " : " + iface + ".SmartGetAttributes";
     const auto note = [&](const Attribute &state) {
-        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached NVMe health details"), state, source);
+        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached NVMe health details"), state, source, Format::HealthQueryStatus);
     };
     Attribute state;
     const QDBusMessage message = healthReply(entity.id, iface, budget, state);
@@ -274,7 +280,7 @@ void ataAttributes(StorageEntity &entity, QElapsedTimer &budget)
     const QString iface = QStringLiteral("org.freedesktop.UDisks2.Drive.Ata");
     const QString source = entity.id + " : " + iface + ".SmartGetAttributes";
     const auto note = [&](const Attribute &state) {
-        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached ATA SMART attributes"), state, source);
+        field(entity.fields, iface + "/SmartGetAttributes", QT_TRANSLATE_NOOP("Storage", "Cached ATA SMART attributes"), state, source, Format::HealthQueryStatus);
     };
     Attribute state;
     const QDBusMessage reply = healthReply(entity.id, iface, budget, state);
@@ -307,12 +313,13 @@ void ataAttributes(StorageEntity &entity, QElapsedTimer &budget)
     if (attributes.isEmpty()) { note({}); return; }
     entity.ataAttributes = std::move(attributes); // Publish complete, validated list only.
 }
-void addService(StorageProperties &result, const QSet<QString> &nativePaths)
+void addService(StorageProperties &result, const QSet<QString> &nativePaths, const QString &selectedPath)
 {
     const StorageObjects objects = serviceSnapshot(result);
     if (objects.isEmpty()) return;
     const QString prefix = QStringLiteral("org.freedesktop.UDisks2.");
     QSet<QString> wanted;
+    QSet<QString> selectedDrives;
     QMap<QString, QString> blocks;
     for (auto it = objects.cbegin(); it != objects.cend(); ++it) {
         const QVariant value = it.value().value(prefix + "Block").value("DeviceNumber");
@@ -322,6 +329,10 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths)
         if (nativePaths.contains(path)) {
             wanted.insert(it.key().path());
             blocks.insert(it.key().path(), path);
+            if (path == selectedPath || path.startsWith(selectedPath + '/')) {
+                const QString drive = objectPath(it.value().value(prefix + "Block").value("Drive"));
+                if (!drive.isEmpty() && drive != "/") selectedDrives.insert(drive);
+            }
         }
     }
     // No guessed model/serial matching; each drive object is retained once.
@@ -346,16 +357,23 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths)
         }
         if (wanted.size() == before) break;
     }
-    QElapsedTimer healthBudget;
-    healthBudget.start(); // Shared by all related ATA and NVMe cache-method calls.
+    QList<QDBusObjectPath> ordered;
     for (auto it = objects.cbegin(); it != objects.cend(); ++it) {
+        if (wanted.contains(it.key().path())) ordered.append(it.key());
+    }
+    // Prioritize explicit selected-device associations; retain object-path order
+    // within each tier and do not guess a single drive for spanning volumes.
+    std::stable_sort(ordered.begin(), ordered.end(), [&](const QDBusObjectPath &a, const QDBusObjectPath &b) {
+        return selectedDrives.contains(a.path()) && !selectedDrives.contains(b.path());
+    });
+    QElapsedTimer healthBudget; // Shared by all related ATA and NVMe cache-method calls.
+    for (const QDBusObjectPath &path : ordered) {
         if (QThread::currentThread()->isInterruptionRequested()) return;
-        if (!wanted.contains(it.key().path())) continue;
         StorageEntity entity;
-        entity.id = it.key().path();
+        entity.id = path.path();
         if (blocks.contains(entity.id)) link(result, blocks.value(entity.id), entity.id,
             QT_TRANSLATE_NOOP("Storage", "UDisks2 block metadata"), "UDisks2 Block.DeviceNumber / sysfs dev");
-        const auto &interfaces = it.value();
+        const auto &interfaces = objects.constFind(path).value();
         const auto copy = [&](const char *iface, const char *key, const char *label,
                               Format format = Format::Text, bool zeroUnknown = false) {
             serviceField(entity, interfaces.value(prefix + QLatin1String(iface)), prefix + QLatin1String(iface), key, label, format, zeroUnknown);
@@ -611,7 +629,7 @@ StorageProperties collectStorageProperties(const Device &device, bool cachedServ
                 link(result, device.path, path, QT_TRANSLATE_NOOP("Storage", "Controller namespace / partition"), "sysfs ancestry");
     }
 #ifdef QLDM_HAVE_DBUS
-    if (cachedService && !QThread::currentThread()->isInterruptionRequested()) addService(result, wanted);
+    if (cachedService && !QThread::currentThread()->isInterruptionRequested()) addService(result, wanted, device.path);
 #else
     Q_UNUSED(cachedService);
     field(result.notes, "service", QT_TRANSLATE_NOOP("Storage", "UDisks2 metadata"), {ReadState::Unsupported, {}, 0}, "QtDBus not enabled in this build");

@@ -409,8 +409,15 @@ spare threshold, estimated endurance used, total bytes read/written, controller
 busy time, power cycles, unsafe shutdowns, media/data-integrity errors, error-log
 entry count, temperature sensors, temperature thresholds and time above them.
 The method returns UDisks2's stored log; it does not request a SMART update.
-ATA and NVMe detailed-cache calls share a 2.5-second wait budget across related drives,
-with cancellation checks every 50 ms, no service activation or interactive
+ATA and NVMe detailed-cache calls share a 2.5-second wait budget across related
+drives, starting at the first detailed query. Drives explicitly associated with
+the selected block device or its descendant namespaces/partitions are queried
+first; object-path order is retained within each priority tier. Spanning volumes
+without such an association do not imply a preferred drive. After the budget is
+exhausted, remaining detailed queries are reported as **Not queried: shared
+health-query time limit reached**, separately from requests that were sent and
+timed out. Basic cached properties remain available for all related drives.
+Collection uses cancellation checks every 50 ms, no service activation or interactive
 authorization, and accepted replies limited to 64 dictionary entries and eight
 sensors. Missing keys, invalid D-Bus types, unsupported methods, permission
 failures and timeouts stay explicit; the basic cached health fields remain usable.

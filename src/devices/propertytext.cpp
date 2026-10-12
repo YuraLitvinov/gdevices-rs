@@ -39,6 +39,9 @@ QString detailsPropertyStatus(const PropertyEntry &entry)
 QString storageFieldValue(const StorageField &field)
 {
     const Attribute &value = field.value;
+    if (field.format == StorageField::Format::HealthQueryStatus
+        && value.state == ReadState::Unavailable && value.error == ETIMEDOUT)
+        return QCoreApplication::translate("Storage", "Not queried: shared health-query time limit reached");
     if (value.state == ReadState::Unsupported) {
         if (field.id == "service")
             return QCoreApplication::translate("Storage", "UDisks2 support is not enabled in this build");
@@ -51,6 +54,7 @@ QString storageFieldValue(const StorageField &field)
     if (value.state != ReadState::Available) return propertyReadValue(value);
     using Format = StorageField::Format;
     switch (field.format) {
+    case Format::HealthQueryStatus:
     case Format::Text:
         if (field.id == "service" && value.value == "cached") return QCoreApplication::translate("Storage", "Available; cached properties only");
         if (field.id == "mountinfo" && value.value == "application-namespace")
