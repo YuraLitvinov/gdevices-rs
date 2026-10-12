@@ -350,8 +350,10 @@ be forcibly canceled. The first dialog opening collects a snapshot; reopening
 reuses it until Refresh is requested. Additional collectors cover Secure Boot/MOK certificates, firmware memory
 records, CPU feature lists and GPU Resizable BAR metadata; their data sources and
 bounds are documented in the implementation reference. SystemDialog presents
-System, Secure Boot, Hardware and firmware, Processor and RAM/Memory tabs;
-Refresh and Copy all cover the entire snapshot. Alt+I opens the dialog.
+System, BIOS/UEFI, Processor and RAM/Memory tabs. Secure Boot status and MOK
+certificate groups appear below firmware identity in BIOS/UEFI; Physical RAM and
+Usable RAM precede memory-device records in RAM/Memory. Refresh and Copy all
+cover the entire snapshot. Alt+I opens the dialog.
 
 Topology counts unique package IDs and package/die/core tuples across present
 CPUs; absent optional die IDs remain undetermined components. Negative or missing

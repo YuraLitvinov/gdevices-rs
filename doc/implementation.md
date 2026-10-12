@@ -437,8 +437,9 @@ The system overview shows hostname, operating system, kernel architecture/releas
 build, CPU models, sockets and cores, present and online logical processors, unique
 cache totals by level/type, uptime, motherboard identity, firmware version/date,
 boot-mode evidence and reported hypervisor identity. Its existing sections are
-presented as scrollable tabs: **System**, **Secure Boot**, **Hardware and firmware**,
-**Processor**, and **RAM/Memory**. Refresh and Copy all cover every tab.
+presented as scrollable tabs: **System**, **BIOS/UEFI**, **Processor**, and
+**RAM/Memory**. The BIOS/UEFI tab ends with Secure Boot status and MOK certificate
+groups. Refresh and Copy all cover every tab.
 
 The **System** tab includes **Resizable BAR (GPU)** for PCI display controllers.
 It separates kernel-exposed capability (**Supported** or **Not exposed by kernel**),
@@ -469,7 +470,8 @@ values are valid, their difference is shown as system-reserved RAM, covering all
 memory unavailable to Linux rather than only firmware reservations. Missing
 capacity is left unavailable instead of guessed.
 
-**RAM/Memory** is a separate System Information tab following **Processor**. Each cached udev `dmi/id` record shows capacity, explicit presence
+**RAM/Memory** follows **Processor**, with Physical RAM and Usable RAM at the top,
+above the firmware memory-device records. Each cached udev `dmi/id` record shows capacity, explicit presence
 when supplied, device/bank locators, type, form factor, rated/configured transfer
 rates in MT/s, manufacturer and part number. Volatile and nonvolatile capacities
 remain separate when reported. The same cache snapshot supplies the existing
