@@ -195,6 +195,8 @@ StoragePresentation storagePresentation(const StorageProperties &snapshot, const
             for (const AtaSmartAttribute &attribute : entity.ataAttributes) row.fields.append(ataAttribute(attribute, entity.id));
             if (row.fields.isEmpty()) row.fields.append({tr("Cached health"), tr("Unavailable"), entity.id});
             result.health.append(row);
+            if (selectedDrives.size() == 1 && selectedDrives.contains(entity.id))
+                result.preferredHealthDrive = entity.id;
             if (selectedDrives.size() > 1 && selectedDrives.contains(entity.id)) {
                 result.overview.append({tr("Associated drive"), row.name, entity.id});
                 overview(result.overview, entity);

@@ -389,6 +389,12 @@ is not a guarantee of health. Opening or reloading Properties never requests SMA
 updates, background polling or self-tests. UDisks2 may update its own cache
 independently.
 
+The Health drive selector initially prefers the selected device's uniquely
+associated drive, using explicit block mappings or controller descendants.
+Related drives remain listed. Reload preserves the user's selected drive when it
+is still present; otherwise the unique association is preferred again. When no
+unique association exists, the selector uses the first listed drive.
+
 For NVMe controllers with a valid health-cache timestamp, the Health tab also
 shows cached power-on hours and calls `SmartGetAttributes` for spare capacity,
 spare threshold, estimated endurance used, total bytes read/written, controller

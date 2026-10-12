@@ -12,6 +12,7 @@ struct StoragePresentation {
     QVector<StorageDisplayField> overview;
     QVector<StorageDisplayRow> volumes;
     QVector<StorageDisplayRow> health;
+    QString preferredHealthDrive; // Unique explicit association with the selected device, if any.
     QString notes;
 };
 StoragePresentation storagePresentation(const StorageProperties &snapshot, const QString &selectedPath);

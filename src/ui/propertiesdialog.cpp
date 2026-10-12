@@ -1645,7 +1645,9 @@ void PropertiesDialog::rebuildStorage()
             healthDrive_->addItem(entry.name, entry.id);
             healthDrive_->setItemData(healthDrive_->count() - 1, entry.source.toHtmlEscaped(), Qt::ToolTipRole);
         }
-        const int selected = healthDrive_->findData(previousDrive);
+        int selected = healthDrive_->findData(previousDrive);
+        if (selected < 0 && !storagePresentation_.preferredHealthDrive.isEmpty())
+            selected = healthDrive_->findData(storagePresentation_.preferredHealthDrive);
         healthDrive_->setCurrentIndex(selected < 0 ? 0 : selected);
     }
     showHealth();

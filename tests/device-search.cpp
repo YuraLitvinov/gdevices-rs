@@ -370,14 +370,39 @@ int main(int argc, char **argv)
     check(storageFieldsText(presented.overview).contains("Block capacity:")
           && storageFieldsText(presented.overview).contains("Drive capacity:"),
           "Physical drive capacity is separate from selected block capacity");
+    check(presented.preferredHealthDrive == cachedDrive.id,
+          "A unique explicit drive association determines the initial health selection");
+    {
+        // A related drive sorts before the selected device's drive (e.g. RAID/LVM).
+        StorageProperties related = storage;
+        StorageEntity otherDrive = cachedDrive;
+        otherDrive.id = "/org/freedesktop/UDisks2/drives/aaa_related";
+        related.entities.append(otherDrive);
+        auto multiple = storagePresentation(related, nativeBlock.id);
+        check(multiple.health.size() == 2 && multiple.health.front().id == otherDrive.id
+              && multiple.preferredHealthDrive == cachedDrive.id,
+              "A related drive's sort order cannot determine the selected device's preferred health drive");
+        const QString controller = "/sys/devices/fixture";
+        check(storagePresentation(related, controller).preferredHealthDrive == cachedDrive.id,
+              "A controller can prefer the unique drive explicitly associated with its descendants");
+        StorageEntity otherBlock {controller + "/block/sdb", {sf("DEVNAME", "/dev/sdb")}};
+        related.entities.append(otherBlock);
+        related.links.append({otherBlock.id, otherDrive.id, "Storage relationship", "org.freedesktop.UDisks2.Block.Drive"});
+        check(storagePresentation(related, controller).preferredHealthDrive.isEmpty(),
+              "Multiple explicitly associated drives do not establish a unique preferred health drive");
+    }
     storage.links.removeFirst();
     check(storagePresentation(storage, nativeBlock.id).volumes.size() == 2,
           "Matching object basenames without an exact mapping never merge entities");
+    check(storagePresentation(storage, nativeBlock.id).preferredHealthDrive.isEmpty(),
+          "Without exact block mapping, object basenames cannot establish the preferred health drive");
     storage.entities = {nativeBlock};
     storage.links.clear();
     presented = storagePresentation(storage, nativeBlock.id);
     check(presented.health.size() == 1 && storageRowsText(presented.health).contains("Unavailable"),
           "Native-only snapshots explicitly report unavailable cached health");
+    check(presented.preferredHealthDrive.isEmpty(),
+          "Unavailable native-only health has no preferred UDisks2 drive");
     Device storageDevice = device;
     storageDevice.subsystem = "block";
     DeviceProperties storageSnapshot;
