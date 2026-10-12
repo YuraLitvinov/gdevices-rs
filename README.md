@@ -11,7 +11,7 @@ does not upload it.
 ![QLinuxDeviceManager showing the Linux hardware device tree](screenshots/main-window.webp)
 
 [More screenshots](SCREENSHOTS.md) ·
-[Download an AppImage](https://github.com/birdie-github/QLinuxDeviceManager/actions/workflows/ci.yml) ·
+[Download an AppImage](https://github.com/birdie-github/QLinuxDeviceManager/releases) ·
 [Build from source](doc/implementation.md#build-and-installation)
 
 ## What you can see
@@ -41,10 +41,8 @@ and copy information from the dialogs for troubleshooting or bug reports.
 
 ## Download and run on Linux
 
-An **x86_64 AppImage** is available from successful runs of the
-[Linux AppImage workflow](https://github.com/birdie-github/QLinuxDeviceManager/actions/workflows/ci.yml).
-Open a successful run, download its AppImage artifact from the **Artifacts** section,
-and extract the ZIP. GitHub requires you to sign in to download workflow artifacts.
+An **x86_64 AppImage** is available the releases page
+[Linux AppImage](https://github.com/birdie-github/QLinuxDeviceManager/releases).
 
 In the folder containing the extracted AppImage, run:
 

@@ -11,6 +11,7 @@
 
 class QAction;
 class QLineEdit;
+class QProgressBar;
 class QCheckBox;
 class DeviceFilter;
 class DeviceModel;
@@ -75,6 +76,8 @@ private:
     Enumerator worker_;
     quint64 requested_ = 0;
     bool busy_ = false;
+    bool initializing_ = true;
+    QProgressBar *initializationProgress_ = nullptr;
     bool closing_ = false;
     QSet<QString> expanded_;
     QString selectedPath_;

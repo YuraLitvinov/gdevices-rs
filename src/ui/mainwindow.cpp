@@ -25,6 +25,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPixmap>
+#include <QProgressBar>
 #include <QSettings>
 #include <QStatusBar>
 #include <QStyle>
@@ -204,7 +205,14 @@ MainWindow::MainWindow()
     toolbar->addAction(refreshAction_);
     toolbar->addAction(propertiesAction_);
     view->addAction(toolbar->toggleViewAction());
-    statusBar();
+    initializationProgress_ = new QProgressBar(this);
+    initializationProgress_->setRange(0, 0); // The initial scan has no reliable total.
+    initializationProgress_->setTextVisible(false);
+    initializationProgress_->setMinimumWidth(100);
+    initializationProgress_->setMaximumWidth(180);
+    initializationProgress_->setAccessibleName(tr("Initializing devices"));
+    statusBar()->addPermanentWidget(initializationProgress_);
+    statusBar()->showMessage(tr("Initializing…"));
 
     QSettings settings;
     restoreGeometry(settings.value("window/geometry").toByteArray());
@@ -239,7 +247,7 @@ void MainWindow::refresh()
     if (closing_) return;
     busy_ = true;
     requested_ = worker_.requestRefresh();
-    statusBar()->showMessage(tr("Refreshing devices…"));
+    updateStatus();
     if (!worker_.isRunning()) worker_.start();
 }
 void MainWindow::acceptInventory(const Inventory &inventory)
@@ -247,6 +255,8 @@ void MainWindow::acceptInventory(const Inventory &inventory)
     Q_ASSERT(QThread::isMainThread());
     worker_.acknowledge();
     if (closing_) return;
+    initializing_ = false;
+    initializationProgress_->hide(); // A failed initial scan is a completed attempt too.
     events_ = inventory.events;
     // Update before marking a removed dialog so its final removal observation
     // stays in the read-only snapshot. Future instances cannot enter that tab.
@@ -345,7 +355,10 @@ void MainWindow::updateStatus()
     if (closing_) return;
     propertiesAction_->setEnabled(tree_->currentIndex().data(DeviceModel::NodeKeyRole).toString() == "computer"
         || !propertyTarget(tree_->currentIndex()).data(DeviceModel::PathRole).toString().isEmpty());
-    if (busy_) { statusBar()->showMessage(tr("Refreshing devices…")); return; }
+    if (initializing_ || busy_) {
+        statusBar()->showMessage(initializing_ ? tr("Initializing…") : tr("Refreshing devices…"));
+        return;
+    }
     QString message = tr("%1 shown / %2 discovered").arg(filter_->visibleCount()).arg(model_->inventoryCount());
     if (filter_->active() && deepSearch_->isChecked()) {
         message += tr(" — Deep search: %1/%2").arg(searchDone_).arg(searchTotal_);
@@ -367,6 +380,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 {
     if (!closing_) saveSettings();
     closing_ = true;
+    initializationProgress_->hide();
     pendingProperties_.reset();
     cancelSearch();
     if (worker_.isRunning() || propertiesWorker_.isRunning() || searchWorker_.isRunning() || systemWorker_.isRunning()) {
