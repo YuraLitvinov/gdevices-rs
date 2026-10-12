@@ -17,6 +17,7 @@
 
 namespace {
 constexpr int replyLimit = 65536;
+constexpr int genlHeaderSize = static_cast<int>(GENL_HDRLEN);
 constexpr unsigned int bitLimit = 4096;
 constexpr int budgetMs = 2000; // Shared by family lookup and all replies for an interface.
 Attribute available(const QString &value) { return {ReadState::Available, value, 0}; }
@@ -95,7 +96,7 @@ public:
         error_ = 0;
         if (timer_.elapsed() >= budgetMs) { error_ = ETIMEDOUT; return false; }
         if (QThread::currentThread()->isInterruptionRequested()) { error_ = ECANCELED; return false; }
-        QByteArray message(NLMSG_HDRLEN + GENL_HDRLEN, '\0');
+        QByteArray message(NLMSG_HDRLEN + genlHeaderSize, '\0');
         message.append(attrs);
         nlmsghdr header {};
         header.nlmsg_len = static_cast<__u32>(message.size());
@@ -153,10 +154,10 @@ public:
                     error_ = -code; return false;
                 }
                 if (response.nlmsg_type != family || response.nlmsg_flags & (NLM_F_MULTI | NLM_F_DUMP_INTR)
-                    || length < GENL_HDRLEN) { error_ = EPROTO; return false; }
+                    || length < genlHeaderSize) { error_ = EPROTO; return false; }
                 genlmsghdr reply {};
                 std::memcpy(&reply, data, sizeof(reply));
-                if (reply.cmd != replyCommand || !attributes(QByteArray(data + GENL_HDRLEN, length - GENL_HDRLEN), result)) {
+                if (reply.cmd != replyCommand || !attributes(QByteArray(data + genlHeaderSize, length - genlHeaderSize), result)) {
                     error_ = EPROTO; return false;
                 }
                 return true;
