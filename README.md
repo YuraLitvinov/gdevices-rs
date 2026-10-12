@@ -333,6 +333,9 @@ information uses grouped fields; a mode table keeps capture queue, pixel format,
 resolution and frame intervals together. The table shows all rows vertically,
 scrolling with the Properties page; column headings and cells wrap to the
 available width and are remeasured when resized or the theme/font changes.
+The live table omits numeric pixel-format IDs and uses concise names such as
+**MJPEG** and **YUYV 4:2:2**. Copy retains the original FourCC, numeric ID, driver
+description and format annotations. Unfamiliar formats keep their reported names.
 Single-plane and multi-plane capture
 are kept separate. Metadata-only, radio/output and memory-to-memory codec nodes
 are excluded after capability detection; if access fails, a video node retains

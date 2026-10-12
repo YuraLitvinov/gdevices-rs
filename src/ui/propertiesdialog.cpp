@@ -934,6 +934,15 @@ void PropertiesDialog::rebuildCamera()
             const quint32 flags = static_cast<quint32>(row.value("flags").toInteger());
             if (flags & 1) format += tr(" (compressed)");
             if (flags & 2) format += tr(" (emulated, reported by driver)");
+            // Keep the complete driver report for Copy, with concise names in the table.
+            QString displayFormat;
+            if (fourcc == "MJPG") displayFormat = "MJPEG";
+            else if (fourcc == "YUYV") displayFormat = "YUYV 4:2:2";
+            else if (description == fourcc || description.startsWith(fourcc + ' ')) displayFormat = description;
+            else displayFormat = description.isEmpty() ? fourcc : fourcc + " — " + description;
+            if (code & 0x80000000U) displayFormat += tr(" (big endian)");
+            if ((flags & 1) && fourcc != "MJPG") displayFormat += tr(" (compressed)");
+            if (flags & 2) displayFormat += tr(" (emulated, reported by driver)");
             const QString kind = row.value("size_kind").toString();
             QString size;
             if (row.contains("size_error")) size = errorText(row.value("size_error").toInt());
@@ -961,7 +970,9 @@ void PropertiesDialog::rebuildCamera()
                 rates += interval.value("kind") == "continuous" ? tr(" (continuous)")
                     : tr(" (interval step: %1 s)").arg(fractionText(interval.value("step").toArray()));
             }
-            const QStringList values {row.value("queue") == "multi" ? tr("Multiple planes") : tr("Single plane"), format, size, rates};
+            const QStringList values {row.value("queue") == "multi" ? tr("Multiple planes") : tr("Single plane"), displayFormat, size, rates};
+            QStringList copyValues = values;
+            copyValues[1] = format;
             const QString source = data.node + ": VIDIOC_ENUM_FMT / VIDIOC_ENUM_FRAMESIZES / VIDIOC_ENUM_FRAMEINTERVALS\n"
                 + tr("Intervals queried only for this pixel format and exact discrete size. Ranges are not expanded.");
             copy.append(QString()); copy.append(tr("Mode %1").arg(index + 1));
@@ -969,7 +980,7 @@ void PropertiesDialog::rebuildCamera()
                 auto *item = new QTableWidgetItem(values.at(column));
                 item->setToolTip(source); item->setTextAlignment(Qt::AlignLeading | Qt::AlignTop);
                 table->setItem(static_cast<int>(index), column, item);
-                copy.append(headers.at(column) + ": " + values.at(column));
+                copy.append(headers.at(column) + ": " + copyValues.at(column));
             }
         }
         table->fitContents();
