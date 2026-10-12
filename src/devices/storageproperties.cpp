@@ -373,7 +373,8 @@ void addService(StorageProperties &result, const QSet<QString> &nativePaths, con
         entity.id = path.path();
         if (blocks.contains(entity.id)) link(result, blocks.value(entity.id), entity.id,
             QT_TRANSLATE_NOOP("Storage", "UDisks2 block metadata"), "UDisks2 Block.DeviceNumber / sysfs dev");
-        const auto &interfaces = objects.constFind(path).value();
+        const auto object = objects.constFind(path);
+        const auto &interfaces = object.value();
         const auto copy = [&](const char *iface, const char *key, const char *label,
                               Format format = Format::Text, bool zeroUnknown = false) {
             serviceField(entity, interfaces.value(prefix + QLatin1String(iface)), prefix + QLatin1String(iface), key, label, format, zeroUnknown);
