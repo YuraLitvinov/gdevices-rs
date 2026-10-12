@@ -56,6 +56,11 @@ alone does not establish that its hardware is healthy.
 
 <img src="./screenshots/device-properties.webp" alt="Device Properties">
 
+**Monitor Information**
+
+<img src="./screenshots/monitor-information.webp" alt="Monitor/Display Information
+and capabilities, including resolution, color bit depth, refresh rate, and rotation">
+
 ## Using the application
 
 Launch `qlinuxdevicemanager` from a terminal or its desktop application entry.
