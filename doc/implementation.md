@@ -41,9 +41,11 @@ collapses its branch; Enter or **Properties** opens its properties.
 | Open the system overview | **Alt+I**, **System Information** (leftmost toolbar button), **File → System Information**, or Properties on the computer root |
 | Reread a device's properties | **Reload properties** in its dialog |
 
-Deep search collects metadata in the background. Its cache is refreshed after
-inventory changes or an F5 refresh. Storage deep search uses native metadata;
-it does not query UDisks2 for every device.
+Deep search collects device identifiers, generic properties, resources and native
+storage metadata in the background. Specialized hardware-tab information is not
+fully indexed; camera capabilities, desktop display configuration and UDisks2
+health are excluded. Its cache is refreshed after inventory changes or an F5
+refresh. Storage deep search does not query UDisks2 for every device.
 
 Generic unsupported fields are labelled **Unsupported** without inferring a build
 limitation. Storage reporting distinguishes missing build support, an unavailable
@@ -459,8 +461,10 @@ build, CPU models, sockets and cores, present and online logical processors, uni
 cache totals by level/type, uptime, motherboard identity, firmware version/date,
 boot-mode evidence and reported hypervisor identity. Its existing sections are
 presented as scrollable tabs: **System**, **BIOS/UEFI**, **Processor**, and
-**RAM/Memory**. The BIOS/UEFI tab ends with Secure Boot status and MOK certificate
-groups. Refresh and Copy all cover every tab.
+**RAM/Memory**. The System tab starts with system manufacturer/model and motherboard
+manufacturer/model, followed by a horizontal separator and the remaining system
+fields. The BIOS/UEFI tab shows firmware version/date, then Secure Boot status
+and MOK certificate groups. Refresh and Copy all cover every tab.
 
 The **System** tab includes **Resizable BAR (GPU)** for PCI display controllers.
 It separates kernel-exposed capability (**Supported** or **Not exposed by kernel**),

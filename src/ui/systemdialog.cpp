@@ -7,6 +7,7 @@
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QFont>
+#include <QFrame>
 #include <QSizePolicy>
 #include <QTabWidget>
 #include <QGroupBox>
@@ -77,7 +78,7 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
         value->setWordWrap(true);
         value->setAlignment(Qt::AlignLeading | Qt::AlignTop);
         value->setMinimumWidth(120);
-        const int row = form->count() / 2;
+        const int row = form->count() ? form->rowCount() : 0;
         form->addWidget(name, row, 0, Qt::AlignLeading | Qt::AlignTop);
         form->addWidget(value, row, 1);
         fields_.insert(key, value);
@@ -85,6 +86,14 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
         order_.append(key);
     };
     auto *os = group(tr("System"));
+    field(os, "manufacturer", tr("System manufacturer"));
+    field(os, "model", tr("System model"));
+    field(os, "board_vendor", tr("Motherboard manufacturer"));
+    field(os, "board_model", tr("Motherboard model"));
+    auto *separator = new QFrame(os->parentWidget());
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    os->addWidget(separator, os->rowCount(), 0, 1, 2);
     field(os, "hostname", tr("Hostname"));
     field(os, "os", tr("Operating system"));
     field(os, "architecture", tr("Kernel architecture"));
@@ -95,10 +104,6 @@ SystemDialog::SystemDialog(QWidget *parent) : QDialog(parent)
     field(os, "uptime", tr("Uptime"));
     field(os, "gpu_rebar", tr("Resizable BAR (GPU)"));
     auto *hardware = group(tr("BIOS/UEFI"));
-    field(hardware, "manufacturer", tr("System manufacturer"));
-    field(hardware, "model", tr("System model"));
-    field(hardware, "board_vendor", tr("Motherboard manufacturer"));
-    field(hardware, "board_model", tr("Motherboard model"));
     field(hardware, "firmware", tr("Firmware version"));
     field(hardware, "firmware_date", tr("Firmware date (reported)"));
     field(hardware, "secure_boot", tr("Secure Boot"));

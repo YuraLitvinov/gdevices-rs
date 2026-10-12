@@ -261,7 +261,7 @@ matches. Search temporarily expands matching categories; clearing restores the
 unfiltered category expansion and selection, if that instance is still visible.
 The existing virtual/internal visibility setting applies before both searches.
 
-Deep search includes all General, Driver and Details text (advanced entries as
+Deep search includes generic General, Driver and Details text (advanced entries as
 well), provenance, inventory properties/attributes, grouped-record paths, EFI
 hex/ASCII and resource types, ranges, flags and IRQs. The Properties text
 formatter is shared and uses Qt Core only. Known numeric identifiers and
@@ -271,7 +271,9 @@ exposed by this application is collected; search does not walk arbitrary sysfs
 files or decode EFI payloads. Existing collection limits and access restrictions
 still apply. Failed property reads retain searchable last-inventory metadata
 and are counted in the status bar; partial results from invalidated reads are
-discarded. Search results are observations, not live device state.
+discarded. Specialized hardware tabs are not fully indexed; camera capabilities,
+desktop display configuration and UDisks2 health are excluded. Search results are
+observations, not live device state.
 
 A single additional serial QThread collects metadata using the same pinned,
 instance-checked collector as Properties, even for unopened dialogs. A 150 ms
@@ -350,8 +352,10 @@ be forcibly canceled. The first dialog opening collects a snapshot; reopening
 reuses it until Refresh is requested. Additional collectors cover Secure Boot/MOK certificates, firmware memory
 records, CPU feature lists and GPU Resizable BAR metadata; their data sources and
 bounds are documented in the implementation reference. SystemDialog presents
-System, BIOS/UEFI, Processor and RAM/Memory tabs. Secure Boot status and MOK
-certificate groups appear below firmware identity in BIOS/UEFI; Physical RAM and
+System, BIOS/UEFI, Processor and RAM/Memory tabs. System manufacturer/model and
+motherboard manufacturer/model appear first in System, above a horizontal
+separator. Secure Boot status and MOK certificate groups appear below firmware
+version/date in BIOS/UEFI; Physical RAM and
 Usable RAM precede memory-device records in RAM/Memory. Refresh and Copy all
 cover the entire snapshot. Alt+I opens the dialog.
 

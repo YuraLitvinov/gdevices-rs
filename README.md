@@ -36,8 +36,10 @@ does not upload it.
   hardware, and inspect events recorded during the current session.
 - **UEFI variables:** browse readable firmware variables and view their raw contents.
 
-Search device names, enable **Deep search** to include properties and resources,
-and copy information from the dialogs for troubleshooting or bug reports.
+Search device names, enable **Deep search** to include identifiers, generic
+properties, resources and native storage metadata, and copy information from the
+dialogs for troubleshooting or bug reports. Deep search does not cover every
+field in specialized hardware tabs.
 
 ## Download and run on Linux
 
@@ -80,7 +82,7 @@ if installed. The installed command is `qlinuxdevicemanager`.
 | Open system information | **Alt+I** or the leftmost toolbar button |
 | Refresh the device list | **F5** |
 | Search | **Ctrl+F** |
-| Search properties and resources too | **Deep search** in the search bar |
+| Search identifiers, generic properties and resources | **Deep search** in the search bar |
 | Clear and close search | **Escape** or toggle **Ctrl+F** |
 | Reveal partitions, UEFI variables and internal devices | **View → Show all devices** |
 | Update an open device report | **Reload properties** |

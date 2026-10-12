@@ -69,7 +69,8 @@ MainWindow::MainWindow()
     filterEdit_->setClearButtonEnabled(true);
     filterEdit_->setPlaceholderText(tr("Device name"));
     deepSearch_ = new QCheckBox(tr("Deep search"), filterBar_);
-    deepSearch_->setToolTip(tr("Search all metadata exposed by Properties, including advanced fields and numbers. Refresh updates cached metadata."));
+    deepSearch_->setToolTip(tr("Search device identifiers, generic properties, resources and native storage metadata. "
+        "Specialized hardware-tab information is not fully indexed. Refresh updates cached metadata."));
     filterLayout->addWidget(filterLabel);
     filterLayout->addWidget(filterEdit_, 1);
     filterLayout->addWidget(deepSearch_);
