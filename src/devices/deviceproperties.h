@@ -19,6 +19,11 @@ struct UsbProperties {
     QVector<UsbInterfaceProperties> interfaces;
     Attribute interfaceState;
 };
+struct BatteryProperties {
+    bool applicable = false;
+    QHash<QString, Attribute> values;
+    Attribute state;
+};
 
 // Owned raw results. Display labels, translations and hex formatting belong to UI.
 struct DeviceProperties {
@@ -31,6 +36,7 @@ struct DeviceProperties {
     Attribute networkState;
     DisplayProperties display;
     UsbProperties usb;
+    BatteryProperties battery;
     bool pcieApplicable = false; // Evidence from this PCI device's link attributes only.
     Attribute pcieType; // Numeric PCI Express device/port type; no GPU-ID inference.
     QString pcieTypeSource;

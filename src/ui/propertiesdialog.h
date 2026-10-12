@@ -38,6 +38,7 @@ private:
     void rebuildDisplay();
     void rebuildUsb();
     void rebuildPcie();
+    void rebuildBattery();
     void showVolume();
     void showHealth();
     void copyResources(bool selectedOnly);
@@ -78,6 +79,9 @@ private:
     QWidget *pciePage_ = nullptr;
     QVBoxLayout *pcieGroups_ = nullptr;
     QString pcieText_;
+    QWidget *batteryPage_ = nullptr;
+    QVBoxLayout *batteryGroups_ = nullptr;
+    QString batteryText_;
     QComboBox *property_ = nullptr;
     QPlainTextEdit *value_ = nullptr;
     QLabel *source_ = nullptr;

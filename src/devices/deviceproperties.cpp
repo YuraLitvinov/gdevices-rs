@@ -170,6 +170,58 @@ void pcieProperties(DeviceProperties &result, int fd)
     result.pcieTypeRequiresRoot = geteuid() != 0;
     result.pcieType = pcieDeviceType(fd, result.pcieTypeSource);
 }
+void batteryProperties(DeviceProperties &result, int fd)
+{
+    if (result.device.subsystem != "power_supply") return;
+    Attribute type = result.values.value("sysfs/type");
+    if (type.error == EOPNOTSUPP || type.error == ENOSYS) type.state = ReadState::Unsupported;
+    const Attribute previousType = result.device.attributes.value("type");
+    // Inventory evidence controls only whether a failed snapshot gets a tab.
+    // It must not replace an unreadable current type or supply battery values.
+    if (type.state == ReadState::Available && type.value != "Battery") return;
+    if (type.state != ReadState::Available
+        && (previousType.state != ReadState::Available || previousType.value != "Battery")) return;
+    BatteryProperties &battery = result.battery;
+    battery.applicable = true;
+    battery.values.insert("type", type);
+    if (type.state != ReadState::Available) { battery.state = type; return; }
+    battery.state = available(QString());
+    for (const char *key : {"manufacturer", "model_name", "serial_number", "present"})
+        battery.values.insert(QLatin1String(key), result.values.value(QStringLiteral("sysfs/") + QLatin1String(key)));
+    const Attribute present = battery.values.value("present");
+    if (present.state == ReadState::Available && present.value != "0" && present.value != "1") {
+        battery.state = failure(EINVAL);
+        return;
+    }
+    const bool absent = present.state == ReadState::Available && present.value == "0";
+    for (const char *key : {"status", "technology", "cycle_count", "capacity", "voltage_now",
+                           "energy_full_design", "energy_full", "energy_now",
+                           "charge_full_design", "charge_full", "charge_now", "current_now", "power_now"}) {
+        if (QThread::currentThread()->isInterruptionRequested()) {
+            battery.state = failure(ECANCELED);
+            battery.values.clear();
+            return;
+        }
+        Attribute value = absent ? Attribute {ReadState::NotApplicable, {}, 0} : readText(fd, key);
+        if (value.error == EOPNOTSUPP || value.error == ENOSYS) value.state = ReadState::Unsupported;
+        battery.values.insert(QLatin1String(key), value);
+    }
+    // A power_supply node can remain while a removable battery disappears.
+    // Reject changed presence/type evidence rather than presenting mixed values.
+    const auto same = [](const Attribute &a, const Attribute &b) {
+        return a.state == b.state && a.value == b.value && a.error == b.error;
+    };
+    const Attribute afterType = readText(fd, "type");
+    const Attribute afterPresent = readText(fd, "present");
+    if (!same(type, afterType) || !same(present, afterPresent)) {
+        battery.values.clear();
+        if (afterType.state != ReadState::Available) battery.state = afterType;
+        else if (!same(present, afterPresent) && afterPresent.state != ReadState::Available) battery.state = afterPresent;
+        else battery.state = failure(EAGAIN);
+        if (battery.state.error == EOPNOTSUPP || battery.state.error == ENOSYS)
+            battery.state.state = ReadState::Unsupported;
+    }
+}
 void usbProperties(DeviceProperties &result, int fd)
 {
     const Device &device = result.device;
@@ -518,6 +570,8 @@ DeviceProperties collectDeviceProperties(const Device &device, bool cachedStorag
         if (!QThread::currentThread()->isInterruptionRequested()) networkProperties(result, deviceFd.fd);
         if (cachedStorageService && !QThread::currentThread()->isInterruptionRequested())
             usbProperties(result, deviceFd.fd);
+        if (cachedStorageService && !QThread::currentThread()->isInterruptionRequested())
+            batteryProperties(result, deviceFd.fd);
         // Desktop-session queries belong to explicit properties requests, not
         // deep search (which passes cachedStorageService=false).
         if (cachedStorageService && d.subsystem == "drm" && d.sysname.contains('-')

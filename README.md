@@ -134,6 +134,7 @@ The modeless Properties dialog provides these tabs when applicable:
 | Network | All assigned IPv4/IPv6 addresses and masks, permanent/current/overridden MAC addresses and MTU, per interface |
 | Display | Desktop-session mode resolution, desktop color depth, nominal refresh rate, rotation/reflection and output scale |
 | PCIe | Current link speed/width, reported device maximum speed/width, and connection type when running as root |
+| Battery | Reported capacities, estimated retention, cycle count, chemistry, voltage, percentage, status, current and power |
 | USB | USB version, connection speed, active configuration, declared power/current, remote wakeup capability and interface functions/drivers |
 | Details | Generic properties, source attribution, advanced raw metadata and copy controls |
 | Resources | Directly reported hardware resource assignments and read/parse errors |
@@ -189,6 +190,29 @@ connection explanation. Other devices and failed type reads retain the link
 sections. This is a generic PCIe topology classification, not an iGPU-ID database,
 and it makes no claim about maximum operating performance. Raw sysfs link readings
 remain available in advanced Details, including on integrated endpoints.
+
+The **Battery** tab appears only on `power_supply` nodes identified as type
+`Battery`, including peripheral batteries exposed by their drivers; it does not
+appear on AC/USB chargers merely because they share the power-supply category.
+Its grouped label/value sections show presence, charging status, charge percentage,
+voltage, current and power, available energy/charge capacities, cycle count,
+chemistry and identity metadata. All values belong to the selected supply.
+Reads are bounded to the fixed attribute list in the properties worker, on demand
+only; there are no subprocesses, polling, setting changes or battery tests.
+**Reload properties** refreshes the snapshot and **Copy battery properties** keeps
+section headings and field labels. Sources are available in field tooltips.
+
+Energy is displayed in Wh and charge in mAh, in separate sections when reported.
+Estimated capacity retention is `100 × full / design`, computed separately from
+positive matching energy or charge measurements; values over 100% are preserved.
+It is a firmware-based estimate, not a complete health verdict. No energy/charge
+conversion, inferred charge percentage or calculated power is substituted for
+missing readings. Current and power retain their reported signs. Cycle count
+`0` means unavailable under the kernel ABI; zero full/design values cannot support
+a retention estimate. Invalid numeric readings, unsupported queries and read
+failures remain explicit. A reported absent battery has measurements marked not
+applicable. Changed type/presence during collection invalidates the battery values;
+a failed type refresh on a previously identified battery shows its read status.
 
 The **Network** tab uses grouped, aligned label/value columns like System
 Information, with Link and IP addresses sections for each interface. Each IP
