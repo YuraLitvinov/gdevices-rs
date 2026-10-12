@@ -399,6 +399,14 @@ is not a guarantee of health. Opening or reloading Properties never requests SMA
 updates, background polling or self-tests. UDisks2 may update its own cache
 independently.
 
+Health uses scrollable group boxes, with one font-derived caption width across
+the report: **Health and endurance** for NVMe (**Health** for ATA), **Usage**,
+**Errors** and **Temperatures**, omitting empty groups. The update timestamp
+appears once at the top of the summary. Captions avoid repeating "Cached";
+the report notice and copied header identify the cached scope. Known NVMe
+critical-warning tokens have readable explanations; unknown tokens remain
+visible. No generic healthy verdict is inferred from missing fields.
+
 The Health drive selector initially prefers the selected device's uniquely
 associated drive, using explicit block mappings or controller descendants.
 Related drives remain listed. Reload preserves the user's selected drive when it
@@ -426,9 +434,11 @@ failures and timeouts stay explicit; the basic cached health fields remain usabl
 
 Counters and percentages preserve zero. Estimated endurance used can exceed
 100%; it is a vendor estimate, not a failure verdict. Zero sensor/threshold
-values and zero power-on hours are unavailable under the API. Temperatures use
-the existing Kelvin-to-Celsius conversion, so integer-Kelvin reports can differ
-slightly from smartctl's rounded display. Data read/written are UDisks2 byte
+values and zero power-on hours are unavailable under the API. Integer-Kelvin NVMe
+temperatures are converted to whole Celsius degrees; ATA temperatures retain
+one decimal place where the source provides finer precision. Unreported NVMe
+sensor slots are omitted; a failed sensor-array decode remains visible as one
+sensor-status field. Data read/written are UDisks2 byte
 estimates, not raw NVMe data-unit counters. Counts summarize error-log entries;
 individual error records, past self-test logs and thermal transition counters
 are not exposed by this collection. Health data is controller-wide and is not
@@ -437,8 +447,13 @@ attributed as namespace-specific measurements.
 ATA HDDs and SSDs also use cached `Drive.Ata.SmartGetAttributes`, including
 USB-attached drives when UDisks2 exposes that interface through their bridge.
 The Health tab shows power-on seconds/hours, past attribute-failure count and
-all returned attributes, retaining the authoritative drive-specific name and ID,
-current/worst/threshold normalized values, flags and UDisks2's interpreted value.
+all returned attributes in an alternating-row, read-only table ordered by ID.
+Columns retain the authoritative drive-specific name and ID, current/worst/threshold
+normalized values, flags and UDisks2's interpreted value. Header and cell tooltips
+explain normalized values, flags and provenance. The table grows with its rows
+and scrolls with the report; horizontal scrolling is available at narrow widths.
+Both health-copy buttons include the summary groups and every ATA table row,
+including exact values and sources.
 Unknown normalized values (`-1`) remain unavailable; valid zeros are preserved.
 Unit 0 means no interpreted value. Known interpreted units are dimensionless,
 milliseconds, sectors and millikelvin; unknown units are not guessed. These are

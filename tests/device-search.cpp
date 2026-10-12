@@ -8,6 +8,8 @@
 #include <QObject>
 #include <cstdio>
 #include <QPersistentModelIndex>
+#include <QLocale>
+#include <cerrno>
 
 int main(int argc, char **argv)
 {
@@ -403,6 +405,53 @@ int main(int argc, char **argv)
           "Native-only snapshots explicitly report unavailable cached health");
     check(presented.preferredHealthDrive.isEmpty(),
           "Unavailable native-only health has no preferred UDisks2 drive");
+    {
+        StorageProperties health;
+        const QLocale previousLocale;
+        QLocale::setDefault(QLocale::c());
+        const QString nvme = "org.freedesktop.UDisks2.NVMe.Controller/";
+        const QString attributes = nvme + "SmartGetAttributes/";
+        StorageEntity drive {"/org/freedesktop/UDisks2/drives/nvme_fixture", {
+            sf("org.freedesktop.UDisks2.Drive/Model", "NVMe fixture"),
+            sf(nvme + "SmartUpdated", "1720000000", StorageField::Format::Epoch),
+            sf(nvme + "SmartCriticalWarning", "readonly\nfuture_warning", StorageField::Format::NvmeHealth),
+            sf(attributes + "percent_used", "150", StorageField::Format::Percent),
+            sf(attributes + "media_errors", "0", StorageField::Format::Count),
+            sf(attributes + "temp_sensors/1", "306", StorageField::Format::Kelvin),
+            {attributes + "temp_sensors/2", "Fixture", {}, "fixture:absent", StorageField::Format::Kelvin},
+            {attributes + "temp_sensors/3", "Fixture", {ReadState::Error, {}, EPROTO}, "fixture:invalid", StorageField::Format::Kelvin},
+            {attributes + "temp_sensors/4", "Fixture", {ReadState::Error, {}, EPROTO}, "fixture:invalid", StorageField::Format::Kelvin}
+        }};
+        health.entities = {drive};
+        auto report = storagePresentation(health, drive.id);
+        const QString copied = storageRowsText(report.health);
+        check(report.health.front().healthGroups.front().title == "Health and endurance"
+              && copied.contains("150%") && copied.contains("Media and data integrity errors: 0"),
+              "Grouped NVMe health preserves over-100 endurance estimates and zero error counters");
+        check(copied.contains("Temperature sensor 1: 33 °C") && !copied.contains("Temperature sensor 2")
+              && copied.count("Temperature sensors:") == 1,
+              "NVMe sensor precision, omitted unreported slots and retained sensor errors reach copied output");
+        check(copied.contains("Media is in read-only mode") && copied.contains("future_warning"),
+              "Known critical warnings are explained and unknown warning tokens remain visible");
+        drive.id = "/org/freedesktop/UDisks2/drives/ata_fixture";
+        drive.fields = {sf("org.freedesktop.UDisks2.Drive/Model", "ATA fixture"),
+            sf("org.freedesktop.UDisks2.Drive.Ata/SmartFailing", "0", StorageField::Format::AtaHealth)};
+        drive.ataAttributes = {{194, "temperature-celsius", 0, 100, 95, 0, 306000, 4},
+            {9, "power-on-hours", 0, 0, -1, 0, 1234567, 0},
+            {5, "reallocated-sector-count", 3, 100, 100, 36, 0, 3}};
+        health.entities = {drive};
+        report = storagePresentation(health, drive.id);
+        const auto &table = report.health.front().ataAttributes;
+        const QString ataCopy = storageRowsText(report.health);
+        check(table.size() == 3 && table[0].id == "5" && table[1].current == "0"
+              && table[1].worst == "Unavailable" && table[1].interpreted == "Unavailable"
+              && table[2].interpreted == "32.9 °C",
+              "ATA table preserves ID order, normalized zero, unknown values and millikelvin precision");
+        check(ataCopy.contains("reallocated-sector-count (ID 5)") && ataCopy.contains("0 sectors")
+              && ataCopy.contains("Flags: 0x0003") && ataCopy.contains("Source: " + drive.id),
+              "Health copying includes ATA table values, zero counters, flags and provenance");
+        QLocale::setDefault(previousLocale);
+    }
     Device storageDevice = device;
     storageDevice.subsystem = "block";
     DeviceProperties storageSnapshot;

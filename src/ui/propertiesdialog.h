@@ -63,7 +63,7 @@ private:
     QTableWidget *volumesTable_ = nullptr;
     QFormLayout *volumeDetails_ = nullptr;
     QComboBox *healthDrive_ = nullptr;
-    QFormLayout *healthDetails_ = nullptr;
+    QVBoxLayout *healthGroups_ = nullptr;
     QLabel *storageNotice_ = nullptr;
     QLabel *volumesNotice_ = nullptr;
     QLabel *healthNotice_ = nullptr;

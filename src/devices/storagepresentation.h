@@ -3,10 +3,16 @@
 
 // Owned, widget-free presentation of one bounded collector snapshot.
 struct StorageDisplayField { QString label, value, source; };
+struct StorageDisplayGroup { QString title; QVector<StorageDisplayField> fields; };
+struct StorageDisplayAtaAttribute {
+    QString id, name, current, worst, threshold, interpreted, flags, source;
+};
 struct StorageDisplayRow {
     QString id, name, kind, capacity, filesystem, mounts;
     QString source;
     QVector<StorageDisplayField> fields;
+    QVector<StorageDisplayGroup> healthGroups;
+    QVector<StorageDisplayAtaAttribute> ataAttributes;
 };
 struct StoragePresentation {
     QVector<StorageDisplayField> overview;

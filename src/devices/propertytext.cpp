@@ -81,7 +81,8 @@ QString storageFieldValue(const StorageField &field)
     case Format::Kelvin: {
         bool valid = false;
         const double kelvin = value.value.toDouble(&valid);
-        return valid && kelvin > 0 ? QCoreApplication::translate("Storage", "%1 °C (cached)").arg(QLocale().toString(kelvin - 273.15, 'f', 1)) : QCoreApplication::translate("Storage", "Unavailable");
+        const int precision = field.id.startsWith("org.freedesktop.UDisks2.NVMe.Controller/") ? 0 : 1;
+        return valid && kelvin > 0 ? QCoreApplication::translate("Storage", "%1 °C").arg(QLocale().toString(kelvin - 273.15, 'f', precision)) : QCoreApplication::translate("Storage", "Unavailable");
     }
     case Format::Percent:
     case Format::Hours:
@@ -98,9 +99,24 @@ QString storageFieldValue(const StorageField &field)
         if (field.format == Format::Minutes) return QCoreApplication::translate("Storage", "%1 minutes").arg(text);
         return text;
     }
-    case Format::AtaHealth: return value.value == "1" ? QCoreApplication::translate("Storage", "Failure predicted by drive (cached)")
-        : value.value == "0" ? QCoreApplication::translate("Storage", "No failure predicted by drive (cached; not a guarantee of health)") : QCoreApplication::translate("Storage", "Unavailable");
-    case Format::NvmeHealth: return value.value.isEmpty() ? QCoreApplication::translate("Storage", "No critical warnings reported (cached; not a guarantee of health)") : value.value;
+    case Format::AtaHealth: return value.value == "1" ? QCoreApplication::translate("Storage", "Failure predicted by drive")
+        : value.value == "0" ? QCoreApplication::translate("Storage", "No failure predicted by drive (not a guarantee of health)") : QCoreApplication::translate("Storage", "Unavailable");
+    case Format::NvmeHealth: {
+        if (value.value.isEmpty()) return QCoreApplication::translate("Storage", "No critical warnings reported (not a guarantee of health)");
+        QStringList warnings;
+        for (const QString &warning : value.value.split('\n', Qt::SkipEmptyParts)) {
+            const char *text = nullptr;
+            if (warning == "spare") text = QT_TRANSLATE_NOOP("Storage", "Available spare is below its threshold");
+            else if (warning == "temperature") text = QT_TRANSLATE_NOOP("Storage", "Temperature is outside a permitted threshold");
+            else if (warning == "degraded") text = QT_TRANSLATE_NOOP("Storage", "NVM subsystem reliability is degraded");
+            else if (warning == "readonly") text = QT_TRANSLATE_NOOP("Storage", "Media is in read-only mode");
+            else if (warning == "volatile_mem") text = QT_TRANSLATE_NOOP("Storage", "Volatile-memory backup has failed");
+            else if (warning == "pmr_readonly") text = QT_TRANSLATE_NOOP("Storage", "Persistent memory region is read-only or unreliable");
+            warnings.append(text ? QCoreApplication::translate("Storage", text)
+                : QCoreApplication::translate("Storage", "Unrecognized warning: %1").arg(warning));
+        }
+        return warnings.join('\n');
+    }
     }
     return {};
 }

@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QStringList>
 #include <QLocale>
+#include <algorithm>
 
 namespace {
 QString tr(const char *text) { return QCoreApplication::translate("Storage", text); }
@@ -77,13 +78,9 @@ void fact(QVector<StorageDisplayField> &output, const StorageEntity &entity,
     if (values.size() > 1) text = tr("Conflicting metadata:") + '\n' + text;
     output.append({tr(caption), text, sources.join('\n')});
 }
-StorageDisplayField ataAttribute(const AtaSmartAttribute &attribute, const QString &drive)
+StorageDisplayAtaAttribute ataAttribute(const AtaSmartAttribute &attribute, const QString &drive)
 {
     const auto normalized = [](qint32 value) { return value < 0 ? tr("Unavailable") : QLocale().toString(value); };
-    QStringList lines;
-    lines << tr("Normalized value: %1").arg(normalized(attribute.current))
-          << tr("Worst normalized value: %1").arg(normalized(attribute.worst))
-          << tr("Threshold: %1").arg(normalized(attribute.threshold));
     QString interpreted;
     if (attribute.unit == 0 || (attribute.unit == 4 && attribute.interpreted == 0)) interpreted = tr("Unavailable");
     else if (attribute.interpreted < 0) interpreted = tr("Invalid health metadata");
@@ -94,11 +91,80 @@ StorageDisplayField ataAttribute(const AtaSmartAttribute &attribute, const QStri
     case 4: interpreted = tr("%1 °C").arg(QLocale().toString(attribute.interpreted / 1000.0 - 273.15, 'f', 1)); break;
     default: interpreted = tr("Unavailable (unknown unit %1)").arg(attribute.unit); break;
     }
-    lines << tr("Interpreted value: %1").arg(interpreted)
-          << tr("Flags: 0x%1").arg(attribute.flags, 4, 16, QLatin1Char('0'));
-    const QString label = attribute.name.isEmpty() ? tr("ATA SMART attribute (ID %1)").arg(attribute.id)
-        : tr("%1 (ID %2)").arg(attribute.name).arg(attribute.id);
-    return {label, lines.join('\n'), drive + " : org.freedesktop.UDisks2.Drive.Ata.SmartGetAttributes : ID " + QString::number(attribute.id)};
+    return {QString::number(attribute.id), attribute.name.isEmpty() ? tr("Unnamed attribute") : attribute.name,
+        normalized(attribute.current), normalized(attribute.worst), normalized(attribute.threshold), interpreted,
+        QStringLiteral("0x%1").arg(attribute.flags, 4, 16, QLatin1Char('0')),
+        drive + " : org.freedesktop.UDisks2.Drive.Ata.SmartGetAttributes : ID " + QString::number(attribute.id)};
+}
+void healthGroups(StorageDisplayRow &row, const StorageEntity &entity)
+{
+    QVector<StorageDisplayField> summary, usage, errors, temperatures;
+    static const QMap<QString, const char *> captions {
+        {"health", QT_TRANSLATE_NOOP("Storage", "Health reporting")},
+        {"SmartUpdated", QT_TRANSLATE_NOOP("Storage", "Last health update")},
+        {"SmartSupported", QT_TRANSLATE_NOOP("Storage", "ATA SMART supported")},
+        {"SmartEnabled", QT_TRANSLATE_NOOP("Storage", "ATA SMART enabled")},
+        {"SmartFailing", QT_TRANSLATE_NOOP("Storage", "Drive failure prediction")},
+        {"SmartCriticalWarning", QT_TRANSLATE_NOOP("Storage", "Critical warnings")},
+        {"SmartPowerOnSeconds", QT_TRANSLATE_NOOP("Storage", "Power-on time")},
+        {"SmartPowerOnHours", QT_TRANSLATE_NOOP("Storage", "Power-on time")},
+        {"SmartTemperature", QT_TRANSLATE_NOOP("Storage", "Temperature")},
+        {"SmartNumBadSectors", QT_TRANSLATE_NOOP("Storage", "Bad sectors")},
+        {"SmartNumAttributesFailing", QT_TRANSLATE_NOOP("Storage", "Failing attributes")},
+        {"SmartNumAttributesFailedInThePast", QT_TRANSLATE_NOOP("Storage", "Attributes failed in the past")},
+        {"avail_spare", QT_TRANSLATE_NOOP("Storage", "Available spare")},
+        {"spare_thresh", QT_TRANSLATE_NOOP("Storage", "Spare threshold")},
+        {"percent_used", QT_TRANSLATE_NOOP("Storage", "Estimated endurance used")},
+        {"total_data_read", QT_TRANSLATE_NOOP("Storage", "Total data read")},
+        {"total_data_written", QT_TRANSLATE_NOOP("Storage", "Total data written")},
+        {"ctrl_busy_time", QT_TRANSLATE_NOOP("Storage", "Controller busy time")},
+        {"power_cycles", QT_TRANSLATE_NOOP("Storage", "Power cycles")},
+        {"unsafe_shutdowns", QT_TRANSLATE_NOOP("Storage", "Unsafe shutdowns")},
+        {"media_errors", QT_TRANSLATE_NOOP("Storage", "Media and data integrity errors")},
+        {"num_err_log_entries", QT_TRANSLATE_NOOP("Storage", "Error information log entries")},
+        {"wctemp", QT_TRANSLATE_NOOP("Storage", "Warning temperature threshold")},
+        {"cctemp", QT_TRANSLATE_NOOP("Storage", "Critical temperature threshold")},
+        {"warning_temp_time", QT_TRANSLATE_NOOP("Storage", "Time above warning temperature")},
+        {"critical_temp_time", QT_TRANSLATE_NOOP("Storage", "Time above critical temperature")}
+    };
+    bool nvme = false, sensorErrorShown = false;
+    for (const StorageField &field : entity.fields) {
+        if (!healthField(field)) continue;
+        nvme = nvme || field.id.contains(".NVMe.Controller/");
+        const QString key = field.id.section('/', -1);
+        StorageDisplayField shown = display(field);
+        if (const char *caption = captions.value(key, nullptr)) shown.label = tr(caption);
+        if (key == "SmartGetAttributes") shown.label = field.id.contains(".Drive.Ata/")
+            ? tr("ATA SMART attributes") : tr("NVMe health details");
+        if (field.id.contains("/temp_sensors/")) {
+            // Zero/unreported slots are absent evidence, not failed reads.
+            if (field.value.state == ReadState::Unavailable && !field.value.error) continue;
+            if (field.value.state != ReadState::Available) {
+                if (sensorErrorShown) continue;
+                sensorErrorShown = true;
+                shown.label = tr("Temperature sensors");
+            } else shown.label = tr("Temperature sensor %1").arg(key);
+            temperatures.append(shown);
+        } else if (field.format == StorageField::Format::Kelvin || key.endsWith("temp_time"))
+            temperatures.append(shown);
+        else if (key == "SmartPowerOnSeconds" || key == "SmartPowerOnHours" || key == "total_data_read"
+            || key == "total_data_written" || key == "ctrl_busy_time" || key == "power_cycles" || key == "unsafe_shutdowns")
+            usage.append(shown);
+        else if (key == "SmartNumBadSectors" || key == "SmartNumAttributesFailing"
+            || key == "SmartNumAttributesFailedInThePast" || key == "media_errors" || key == "num_err_log_entries")
+            errors.append(shown);
+        else if (key == "SmartUpdated") summary.prepend(shown);
+        else summary.append(shown);
+    }
+    if (!summary.isEmpty()) row.healthGroups.append({nvme ? tr("Health and endurance") : tr("Health"), summary});
+    if (!usage.isEmpty()) row.healthGroups.append({tr("Usage"), usage});
+    if (!errors.isEmpty()) row.healthGroups.append({tr("Errors"), errors});
+    if (!temperatures.isEmpty()) row.healthGroups.append({tr("Temperatures"), temperatures});
+    QVector<AtaSmartAttribute> attributes = entity.ataAttributes;
+    std::sort(attributes.begin(), attributes.end(), [](const AtaSmartAttribute &a, const AtaSmartAttribute &b) {
+        return a.id < b.id;
+    });
+    for (const AtaSmartAttribute &attribute : attributes) row.ataAttributes.append(ataAttribute(attribute, entity.id));
 }
 QString relation(const StorageLink &link)
 {
@@ -191,9 +257,9 @@ StoragePresentation storagePresentation(const StorageProperties &snapshot, const
             }
             if (!nodes.isEmpty()) row.name += " — " + nodes.join(", ");
             row.kind = tr("Cached drive health");
-            for (const StorageField &field : entity.fields) if (healthField(field)) row.fields.append(display(field));
-            for (const AtaSmartAttribute &attribute : entity.ataAttributes) row.fields.append(ataAttribute(attribute, entity.id));
-            if (row.fields.isEmpty()) row.fields.append({tr("Cached health"), tr("Unavailable"), entity.id});
+            healthGroups(row, entity);
+            if (row.healthGroups.isEmpty() && row.ataAttributes.isEmpty())
+                row.fields.append({tr("Cached health"), tr("Unavailable"), entity.id});
             result.health.append(row);
             if (selectedDrives.size() == 1 && selectedDrives.contains(entity.id))
                 result.preferredHealthDrive = entity.id;
@@ -264,7 +330,21 @@ QString storageFieldsText(const QVector<StorageDisplayField> &fields)
 QString storageRowsText(const QVector<StorageDisplayRow> &rows)
 {
     QStringList text;
-    for (const StorageDisplayRow &row : rows)
-        text.append(row.name + '\n' + storageFieldsText(row.fields));
+    for (const StorageDisplayRow &row : rows) {
+        QStringList sections {row.name};
+        if (!row.healthGroups.isEmpty() || !row.ataAttributes.isEmpty()) sections.append(tr("Cached drive health"));
+        if (!row.fields.isEmpty()) sections.append(storageFieldsText(row.fields));
+        for (const StorageDisplayGroup &group : row.healthGroups)
+            sections.append(group.title + '\n' + storageFieldsText(group.fields));
+        if (!row.ataAttributes.isEmpty()) {
+            QStringList attributes {tr("ATA SMART attributes")};
+            for (const StorageDisplayAtaAttribute &attribute : row.ataAttributes)
+                attributes.append(tr("%1 (ID %2)\nNormalized value: %3\nWorst normalized value: %4\nThreshold: %5\nInterpreted value: %6\nFlags: %7\nSource: %8")
+                    .arg(attribute.name, attribute.id, attribute.current, attribute.worst, attribute.threshold,
+                         attribute.interpreted, attribute.flags, attribute.source));
+            sections.append(attributes.join("\n\n"));
+        }
+        text.append(sections.join("\n\n"));
+    }
     return text.join("\n\n");
 }

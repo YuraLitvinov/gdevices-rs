@@ -29,6 +29,7 @@
 #include <QTimer>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QStringList>
 #include <QTabWidget>
@@ -40,10 +41,10 @@
 #include <utility>
 
 namespace {
-// Camera modes scroll with the Properties page, not inside a short nested view.
-class CameraModeHeader final : public QHeaderView {
+// Long report tables scroll with the Properties page, not inside a short nested view.
+class PropertyReportHeader final : public QHeaderView {
 public:
-    explicit CameraModeHeader(QWidget *parent) : QHeaderView(Qt::Horizontal, parent) {}
+    explicit PropertyReportHeader(QWidget *parent) : QHeaderView(Qt::Horizontal, parent) {}
     int wrappedHeight() const
     {
         int height = 0;
@@ -80,11 +81,11 @@ protected:
         painter->restore();
     }
 };
-class CameraModeTable final : public QTableWidget {
+class PropertyReportTable final : public QTableWidget {
 public:
-    CameraModeTable(int rows, int columns, QWidget *parent) : QTableWidget(rows, columns, parent)
+    PropertyReportTable(int rows, int columns, QWidget *parent) : QTableWidget(rows, columns, parent)
     {
-        setHorizontalHeader(new CameraModeHeader(this));
+        setHorizontalHeader(new PropertyReportHeader(this));
         setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -97,11 +98,13 @@ public:
         // Let the stretched columns settle before measuring wrapped text.
         QTimer::singleShot(0, this, [this] {
             fitQueued_ = false;
-            auto *header = static_cast<CameraModeHeader *>(horizontalHeader());
+            auto *header = static_cast<PropertyReportHeader *>(horizontalHeader());
             const int headerHeight = header->wrappedHeight();
             if (header->height() != headerHeight) header->setFixedHeight(headerHeight);
             resizeRowsToContents();
-            const int height = verticalHeader()->length() + headerHeight + 2 * frameWidth();
+            int height = verticalHeader()->length() + headerHeight + 2 * frameWidth();
+            if (horizontalScrollBarPolicy() != Qt::ScrollBarAlwaysOff)
+                height += horizontalScrollBar()->sizeHint().height();
             if (minimumHeight() != height || maximumHeight() != height) setFixedHeight(height);
         });
     }
@@ -199,7 +202,7 @@ QString selectedStorageText(const QVector<StorageDisplayRow> &rows, int index)
 {
     if (index < 0 || index >= rows.size()) return {};
     const StorageDisplayRow &row = rows[index];
-    return row.name + '\n' + storageFieldsText(row.fields);
+    return storageRowsText({row});
 }
 }
 
@@ -414,7 +417,13 @@ PropertiesDialog::PropertiesDialog(const Device &device, QWidget *parent) : QDia
     healthLabel->setBuddy(healthDrive_);
     healthLayout->addWidget(healthLabel);
     healthLayout->addWidget(healthDrive_);
-    healthDetails_ = storageDetailsForm(healthLayout, healthPage_);
+    auto *healthScroll = new QScrollArea(healthPage_);
+    healthScroll->setWidgetResizable(true);
+    healthScroll->setFrameShape(QFrame::NoFrame);
+    auto *healthReport = new QWidget(healthScroll);
+    healthGroups_ = new QVBoxLayout(healthReport);
+    healthScroll->setWidget(healthReport);
+    healthLayout->addWidget(healthScroll, 1);
     auto *healthButtons = new QHBoxLayout;
     auto *copyHealth = new QPushButton(tr("Copy selected drive health"), healthPage_);
     auto *copyAllHealth = new QPushButton(tr("Copy all drive health"), healthPage_);
@@ -907,7 +916,7 @@ void PropertiesDialog::rebuildCamera()
         const QString title = tr("Format, size and frame rate combinations");
         auto *box = new QGroupBox(title, cameraGroups_->parentWidget());
         auto *layout = new QVBoxLayout(box);
-        auto *table = new CameraModeTable(static_cast<int>(modes.size()), 4, box);
+        auto *table = new PropertyReportTable(static_cast<int>(modes.size()), 4, box);
         const QStringList headers {tr("Capture queue"), tr("Pixel format"), tr("Resolution / range"), tr("Frame rates / intervals")};
         table->setHorizontalHeaderLabels(headers);
         table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -1665,14 +1674,90 @@ void PropertiesDialog::showVolume()
 }
 void PropertiesDialog::showHealth()
 {
+    while (QLayoutItem *item = healthGroups_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
     const int row = healthDrive_->currentIndex();
     if (row < 0 || row >= storagePresentation_.health.size()) {
-        clearForm(healthDetails_);
-        healthDetails_->addRow(plainLabel(tr("Cached health unavailable."), healthDetails_->parentWidget()));
+        healthGroups_->addWidget(plainLabel(tr("Cached health unavailable."), healthGroups_->parentWidget()));
+        healthGroups_->addStretch();
         return;
     }
     const StorageDisplayRow &entry = storagePresentation_.health[row];
-    showStorageFields(healthDetails_, entry.fields);
+    QVector<QGridLayout *> forms;
+    QVector<QLabel *> captions;
+    const auto group = [&](const QString &title, const QVector<StorageDisplayField> &fields) {
+        auto *box = new QGroupBox(title, healthGroups_->parentWidget());
+        auto *form = new QGridLayout(box);
+        form->setColumnStretch(1, 1);
+        forms.append(form);
+        healthGroups_->addWidget(box);
+        int fieldRow = 0;
+        for (const StorageDisplayField &field : fields) {
+            auto *caption = new QLabel(field.label, box);
+            caption->setTextFormat(Qt::PlainText);
+            captions.append(caption);
+            auto *value = plainLabel(field.value, box);
+            QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+            policy.setHeightForWidth(true);
+            value->setSizePolicy(policy);
+            value->setAlignment(Qt::AlignLeading | Qt::AlignTop);
+            value->setMinimumWidth(120);
+            const QString hint = "<qt>" + field.source.toHtmlEscaped().replace('\n', "<br>") + "</qt>";
+            caption->setToolTip(hint);
+            value->setToolTip(hint);
+            form->addWidget(caption, fieldRow, 0, Qt::AlignLeading | Qt::AlignTop);
+            form->addWidget(value, fieldRow++, 1);
+        }
+    };
+    if (!entry.fields.isEmpty()) group(tr("Health"), entry.fields);
+    for (const StorageDisplayGroup &section : entry.healthGroups) group(section.title, section.fields);
+    int captionWidth = 0;
+    for (const QLabel *caption : captions) captionWidth = qMax(captionWidth, caption->sizeHint().width());
+    for (QGridLayout *form : forms) form->setColumnMinimumWidth(0, captionWidth);
+    if (!entry.ataAttributes.isEmpty()) {
+        auto *box = new QGroupBox(tr("ATA SMART attributes"), healthGroups_->parentWidget());
+        auto *layout = new QVBoxLayout(box);
+        auto *table = new PropertyReportTable(static_cast<int>(entry.ataAttributes.size()), 7, box);
+        table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        table->setHorizontalHeaderLabels({tr("ID"), tr("Name"), tr("Current"), tr("Worst"), tr("Threshold"), tr("Interpreted value"), tr("Flags")});
+        const QStringList hints {
+            tr("Attribute ID; the drive-specific name is the authoritative identifier."),
+            tr("UDisks2's drive-specific attribute identifier."),
+            tr("Current normalized value; not necessarily a percentage."),
+            tr("Worst normalized value reported by the drive."),
+            tr("Drive-reported normalized threshold."),
+            tr("UDisks2's interpreted value, not smartctl's raw attribute bytes."),
+            tr("Raw attribute flags: bit 0 indicates pre-failure/old-age; bit 1 indicates online/offline collection.")
+        };
+        for (int column = 0; column < table->columnCount(); ++column) {
+            table->horizontalHeaderItem(column)->setToolTip(hints[column]);
+            table->horizontalHeader()->setSectionResizeMode(column,
+                column == 1 || column == 5 ? QHeaderView::Stretch : QHeaderView::ResizeToContents);
+        }
+        table->verticalHeader()->hide();
+        table->setAlternatingRowColors(true);
+        table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        table->setSelectionBehavior(QAbstractItemView::SelectRows);
+        table->setSelectionMode(QAbstractItemView::ExtendedSelection);
+        for (int index = 0; index < entry.ataAttributes.size(); ++index) {
+            const StorageDisplayAtaAttribute &attribute = entry.ataAttributes[index];
+            const QStringList values {attribute.id, attribute.name, attribute.current, attribute.worst,
+                                      attribute.threshold, attribute.interpreted, attribute.flags};
+            for (int column = 0; column < values.size(); ++column) {
+                auto *item = new QTableWidgetItem(values[column]);
+                item->setToolTip("<qt>" + (hints[column] + '\n' + attribute.source).toHtmlEscaped().replace('\n', "<br>") + "</qt>");
+                if (column == 0 || (column >= 2 && column <= 4) || column == 6)
+                    item->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+                table->setItem(index, column, item);
+            }
+        }
+        layout->addWidget(table);
+        table->fitContents();
+        healthGroups_->addWidget(box);
+    }
+    healthGroups_->addStretch();
 }
 
 void PropertiesDialog::updateEvents(const DeviceEventsSnapshot &history, const QString &monitorNote)
