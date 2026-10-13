@@ -47,9 +47,16 @@ field in specialized hardware tabs.
 - **Shows PCI-express devices** link speed, link width, PCIe version standard.
 - **Shows USB devices** USB version, bandwidth, voltage, power source, remote wakeup
   capability.
-- **Shows full battery status**.
+- **Shows full battery status** including presence, status, charge percentage, voltage,
+  current, power, number of charge cycles, factory (design) and remaining capacities,
+  manufacturer and serial number.
 - **Shows storage devices SMART/health status**, including temperature, bytes read
-  and written (TBW), SMART errors.
+  and written (TBW), available spare, estimated undurance used, power-on time, power
+  cycles, number of unsafe shutdowns, SMART errors.
+- **Shows Secure Boot status** and default plus enrolled MOK keys.
+- **Shows UEFI/BIOS version and date**. Shows whether the system was booted in BIOS
+  or EFI mode.
+- **Shows whether you're running in a virtual environment**.
 - **Includes search/filtering** which allows to instantly view only the devices you
   are interested in.
 - **Includes deep search** which allows to search for almost all reported attributes.
