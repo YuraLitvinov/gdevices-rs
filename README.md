@@ -41,6 +41,22 @@ properties, resources and native storage metadata, and copy information from the
 dialogs for troubleshooting or bug reports. Deep search does not cover every
 field in specialized hardware tabs.
 
+## Unique features not found in other such applications
+- **Shows full RAM information**, including manufacturer, performance (speed in MT/s),
+  number of modules, whether they are soldered or replaceable.
+- **Shows PCI-express devices** link speed, link width, PCIe version standard.
+- **Shows USB devices** USB version, bandwidth, voltage, power source, remote wakeup
+  capability.
+- **Shows full battery status**.
+- **Shows storage devices SMART/health status**, including temperature, bytes read
+  and written (TBW), SMART errors.
+- **Includes search/filtering** which allows to instantly view only the devices you
+  are interested in.
+- **Includes deep search** which allows to search for almost all reported attributes.
+- **Allows to browse and view UEFI variables**.
+- **Live monitoring** - no need to restart the app to discover newly attached devices.
+- **Can show hidden or virtual devices**.
+
 ## Download and run on Linux
 
 An **x86_64 AppImage** is available at [the releases](https://github.com/birdie-github/QLinuxDeviceManager/releases).
