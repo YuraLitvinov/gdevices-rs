@@ -73,10 +73,17 @@ Inside the sandbox `/sys` and `/proc` are those of the host kernel but processes
 network namespaces are the sandbox's, and `libkmod`/`libdisplay-info` must be bundled. Treat this
 as a starting point: it has not been built.
 
-## AppImage (replaces the Qt recipe)
+## AppImage
 
-Stage with `make install PREFIX=/usr DESTDIR=$PWD/AppDir`, then run `linuxdeploy` with
-`--appdir AppDir --desktop-file … --icon-file … --plugin gtk --output appimage`
-(the `linuxdeploy-plugin-gtk` bundles GTK 4 and its schemas). Bundle `libkmod.so.2` and
-`libdisplay-info.so.*` with `--library` since they are `dlopen`ed and invisible to ELF scanning.
-This has not been run; build on the oldest distribution you intend to support.
+`packaging/appimage/build.sh` builds the AppImage on Ubuntu 24.04 (GTK 4.14, glibc 2.39, so it
+runs on distributions with glibc 2.39 or newer). `.github/workflows/appimage.yml` runs it on every
+push; locally:
+
+```sh
+podman run --rm -v "$PWD":/src:Z -e SRC=/src ubuntu:24.04 bash /src/packaging/appimage/build.sh
+```
+
+The result is `dist/QLinuxDeviceManager-<version>-Linux-x86_64.AppImage`. It uses `linuxdeploy`
+with the GTK plugin and bundles `libkmod` and `libdisplay-info` explicitly, since they are
+`dlopen`ed. Translations are not bundled yet (the locale directory is baked in at build time;
+set `QLDM_LOCALE_DIR` to override).

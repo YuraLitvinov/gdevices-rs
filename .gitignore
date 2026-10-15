@@ -9,3 +9,5 @@ BUILD/
 .directory
 executable_graph.k.json
 /target
+dist/
+/target-appimage
