@@ -1,0 +1,1906 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the QLinuxDeviceManager package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: QLinuxDeviceManager\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-15 03:05+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Device addition observed"
+msgstr ""
+
+msgid "Device removal observed"
+msgstr ""
+
+msgid "Device change reported"
+msgstr ""
+
+msgid "Driver binding reported"
+msgstr ""
+
+msgid "Driver unbinding reported"
+msgstr ""
+
+msgid "Device path move reported"
+msgstr ""
+
+msgid "Device online event reported"
+msgstr ""
+
+msgid "Device offline event reported"
+msgstr ""
+
+msgid "udev action: %1"
+msgstr ""
+
+msgid "Unavailable in event payload"
+msgstr ""
+
+msgid "Observed: %1"
+msgstr ""
+
+msgid "Elapsed since monitor startup: %1 ms"
+msgstr ""
+
+msgid "Source: live udev observation"
+msgstr ""
+
+msgid "Action: %1"
+msgstr ""
+
+msgid "Description: %1"
+msgstr ""
+
+msgid "Kernel path: %1"
+msgstr ""
+
+msgid "Subsystem: %1"
+msgstr ""
+
+msgid "Device type: %1"
+msgstr ""
+
+msgid "Driver in event payload: %1"
+msgstr ""
+
+msgid "udev sequence: %1"
+msgstr ""
+
+msgid "Initialization stamp: %1"
+msgstr ""
+
+msgid "Local instance token: %1"
+msgstr ""
+
+msgid "Previous path: %1"
+msgstr ""
+
+msgid ""
+"Live udev events since %1. Receipt times; exact device instance only. Latest "
+"%3 events per device; %2 retained globally. Historical logs are not queried."
+msgstr ""
+
+msgid "monitor startup"
+msgstr ""
+
+msgid "%1 older events evicted from the global history."
+msgstr ""
+
+msgid "%1 events could not be associated safely with an inventory instance."
+msgstr ""
+
+msgid ""
+"%1 event-identity resets after monitor failures/losses; coverage is "
+"incomplete."
+msgstr ""
+
+msgid ""
+"Live event monitoring is unavailable. Viewing and retained events remain "
+"available."
+msgstr ""
+
+msgid "No safe live-event association is available for this instance."
+msgstr ""
+
+msgid ""
+"EFI variables are reconciled by inventory scans; libudev does not supply "
+"their value-change history."
+msgstr ""
+
+msgid ""
+"Removed/replaced device: retained events are a read-only instance snapshot."
+msgstr ""
+
+msgid ""
+"No retained live events for this instance. This does not establish that the "
+"device has had no errors."
+msgstr ""
+
+msgid "AC power adapter"
+msgstr ""
+
+msgid "%1 battery"
+msgstr ""
+
+msgid "Battery"
+msgstr ""
+
+msgid "USB-C power supply (port %1)"
+msgstr ""
+
+msgid "USB power supply"
+msgstr ""
+
+msgid "Headphone jack detection"
+msgstr ""
+
+msgid "Microphone jack detection"
+msgstr ""
+
+msgid "HDMI/DisplayPort jack detection (PCM %1)"
+msgstr ""
+
+msgid "Touchpad (%1)"
+msgstr ""
+
+msgid "Mouse (%1)"
+msgstr ""
+
+msgid "%1 (module candidate)"
+msgstr ""
+
+msgid "Empty value"
+msgstr ""
+
+msgid "Unavailable"
+msgstr ""
+
+msgid "Permission denied"
+msgstr ""
+
+msgid "Device removed"
+msgstr ""
+
+msgid "Unsupported"
+msgstr ""
+
+msgid "Not applicable"
+msgstr ""
+
+msgid "Not queried: shared health-query time limit reached"
+msgstr ""
+
+msgid "UDisks2 support is not enabled in this build"
+msgstr ""
+
+msgid "Drive health is not exposed through a supported UDisks2 interface"
+msgstr ""
+
+msgid "Detailed health query is not supported by UDisks2"
+msgstr ""
+
+msgid "Available; cached properties only"
+msgstr ""
+
+msgid ""
+"Application mount namespace only; other namespaces may differ. No filesystem "
+"is mounted or unlocked."
+msgstr ""
+
+msgid "No mount observed in the application namespace"
+msgstr ""
+
+msgid "Invalid capacity or sector-size metadata"
+msgstr ""
+
+msgid "%1 bytes"
+msgstr ""
+
+msgid "%1 bytes (%2)"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Invalid boolean metadata"
+msgstr ""
+
+msgid "Removable (UDisks2 hint)"
+msgstr ""
+
+msgid "Fixed (UDisks2 hint)"
+msgstr ""
+
+msgid "Invalid removable metadata"
+msgstr ""
+
+msgid "%1 °C"
+msgstr ""
+
+msgid "Invalid health metadata"
+msgstr ""
+
+msgid "%1%"
+msgstr ""
+
+msgid "%1 seconds (%2 hours)"
+msgstr ""
+
+msgid "%1 hours"
+msgstr ""
+
+msgid "%1 minutes"
+msgstr ""
+
+msgid "Failure predicted by drive"
+msgstr ""
+
+msgid "No failure predicted by drive (not a guarantee of health)"
+msgstr ""
+
+msgid "No critical warnings reported (not a guarantee of health)"
+msgstr ""
+
+msgid "Available spare is below its threshold"
+msgstr ""
+
+msgid "Temperature is outside a permitted threshold"
+msgstr ""
+
+msgid "NVM subsystem reliability is degraded"
+msgstr ""
+
+msgid "Media is in read-only mode"
+msgstr ""
+
+msgid "Volatile-memory backup has failed"
+msgstr ""
+
+msgid "Persistent memory region is read-only or unreliable"
+msgstr ""
+
+msgid "Unrecognized warning: %1"
+msgstr ""
+
+msgid "Storage snapshot"
+msgstr ""
+
+msgid ""
+"Each entity is a separate storage layer; capacities are not added. Health is "
+"cached UDisks2 evidence, separate from operational status. Reload never "
+"requests SMART updates or self-tests. Deep search includes native metadata "
+"only."
+msgstr ""
+
+msgid "Storage entity"
+msgstr ""
+
+msgid "Device name"
+msgstr ""
+
+msgid "Application grouping"
+msgstr ""
+
+msgid "Category"
+msgstr ""
+
+msgid "Manufacturer"
+msgstr ""
+
+msgid "Bus / subsystem"
+msgstr ""
+
+msgid "Device udev metadata and direct driver bus"
+msgstr ""
+
+msgid "Location"
+msgstr ""
+
+msgid "Kernel path"
+msgstr ""
+
+msgid "Removed or replaced; showing a snapshot."
+msgstr ""
+
+msgid "Present in the last inventory; properties have not been verified."
+msgstr ""
+
+msgid "Present at the last property read."
+msgstr ""
+
+msgid "No directly bound driver; this alone is not a fault."
+msgstr ""
+
+msgid "Driver bound: %1"
+msgstr ""
+
+msgid "Driver binding: %1"
+msgstr ""
+
+msgid "USB device/interface is unauthorized."
+msgstr ""
+
+msgid "USB device/interface is authorized."
+msgstr ""
+
+msgid "USB authorization: %1"
+msgstr ""
+
+msgid "Device status"
+msgstr ""
+
+msgid "Observed presence, binding and USB authorization only"
+msgstr ""
+
+msgid "No directly bound driver"
+msgstr ""
+
+msgid "Bound kernel driver"
+msgstr ""
+
+msgid "Hardware identifiers"
+msgstr ""
+
+msgid "Selected udev and direct sysfs identifiers"
+msgstr ""
+
+msgid "Driver bus"
+msgstr ""
+
+msgid "Owning kernel module"
+msgstr ""
+
+msgid "Built-in or modular"
+msgstr ""
+
+msgid "Modular (kernel initstate evidence)"
+msgstr ""
+
+msgid ""
+"Undetermined; a missing module link/version does not prove a built-in driver."
+msgstr ""
+
+msgid "Running module version"
+msgstr ""
+
+msgid "Installed module filename"
+msgstr ""
+
+msgid "Installed module version"
+msgstr ""
+
+msgid "Installed module description"
+msgstr ""
+
+msgid "Installed module author"
+msgstr ""
+
+msgid "Installed module license"
+msgstr ""
+
+msgid "Declared firmware names"
+msgstr ""
+
+msgid "Reported device firmware revision"
+msgstr ""
+
+msgid "Metadata scope"
+msgstr ""
+
+msgid ""
+"Installed metadata may differ from code already loaded before an update. "
+"Declared firmware names do not prove firmware is loaded or report its "
+"version."
+msgstr ""
+
+msgid "Parent device path"
+msgstr ""
+
+msgid "Recorded ancestry"
+msgstr ""
+
+msgid "Original name"
+msgstr ""
+
+msgid "Name source"
+msgstr ""
+
+msgid "Kernel name"
+msgstr ""
+
+msgid "Full kernel path"
+msgstr ""
+
+msgid "Direct driver path"
+msgstr ""
+
+msgid "Inventory: %1"
+msgstr ""
+
+msgid "Inventory attribute: %1"
+msgstr ""
+
+msgid "Last inventory; see name source for derived naming metadata"
+msgstr ""
+
+msgid "Empty file"
+msgstr ""
+
+msgid "Truncated: first 65536 bytes shown."
+msgstr ""
+
+msgid "UEFI variable — hex dump"
+msgstr ""
+
+msgid ""
+"Complete efivarfs file bytes, including the attribute prefix; contents are "
+"not decoded."
+msgstr ""
+
+msgid "Query unsupported by the kernel/device"
+msgstr ""
+
+msgid "Malformed ethtool reply"
+msgstr ""
+
+msgid "Query timed out"
+msgstr ""
+
+msgid "Reply exceeds collection limits"
+msgstr ""
+
+msgid "Link changed during collection; reload properties"
+msgstr ""
+
+msgid "%1 Gbps"
+msgstr ""
+
+msgid "%1 Mbps"
+msgstr ""
+
+msgid "Network interfaces"
+msgstr ""
+
+msgid "No network interfaces observed"
+msgstr ""
+
+msgid "Interfaces"
+msgstr ""
+
+msgid "%1 — Ethernet link"
+msgstr ""
+
+msgid "Connected"
+msgstr ""
+
+msgid "Disconnected"
+msgstr ""
+
+msgid "Link status"
+msgstr ""
+
+msgid "Not applicable — link disconnected"
+msgstr ""
+
+msgid "Unavailable (driver reports unknown speed)"
+msgstr ""
+
+msgid "Link speed"
+msgstr ""
+
+msgid ""
+"Driver-reported operational speed, not measured throughput; it may be forced "
+"when autonegotiation is disabled."
+msgstr ""
+
+msgid "Half duplex"
+msgstr ""
+
+msgid "Full duplex"
+msgstr ""
+
+msgid "Unavailable (driver reports unknown duplex)"
+msgstr ""
+
+msgid "Unrecognized duplex value: %1"
+msgstr ""
+
+msgid "Duplex"
+msgstr ""
+
+msgid "Disabled"
+msgstr ""
+
+msgid "Enabled"
+msgstr ""
+
+msgid "Unrecognized autonegotiation value: %1"
+msgstr ""
+
+msgid "Autonegotiation"
+msgstr ""
+
+msgid "Supported modes / capabilities"
+msgstr ""
+
+msgid ""
+"Kernel-named supported-mask entries include link modes and media, pause or "
+"autonegotiation capabilities. Unnamed bits retain their numeric index."
+msgstr ""
+
+msgid "Not applicable — autonegotiation disabled"
+msgstr ""
+
+msgid "Unavailable — no partner advertisement reported"
+msgstr ""
+
+msgid "Link-partner advertised modes"
+msgstr ""
+
+msgid "%1 — Link"
+msgstr ""
+
+msgid "Driver permanent address: ETHTOOL_GPERMADDR"
+msgstr ""
+
+msgid "Hardware MAC address"
+msgstr ""
+
+msgid "Current MAC address"
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Unavailable; permanent MAC could not be determined"
+msgstr ""
+
+msgid "Overridden MAC address"
+msgstr ""
+
+msgid "MTU"
+msgstr ""
+
+msgid "Ethernet details"
+msgstr ""
+
+msgid "%1 — IP addresses"
+msgstr ""
+
+msgid "getifaddrs: application network namespace"
+msgstr ""
+
+msgid "None assigned"
+msgstr ""
+
+msgid "IP addresses"
+msgstr ""
+
+msgid "IPv4 address"
+msgstr ""
+
+msgid "IPv6 address"
+msgstr ""
+
+msgid "Device busy"
+msgstr ""
+
+msgid "Previous camera query has not exited; retry later"
+msgstr ""
+
+msgid "Enumeration or report limit reached"
+msgstr ""
+
+msgid "Malformed driver response"
+msgstr ""
+
+msgid "Capture device"
+msgstr ""
+
+msgid "Device node"
+msgstr ""
+
+msgid "Driver-reported snapshot"
+msgstr ""
+
+msgid "Incomplete enumeration: %1"
+msgstr ""
+
+msgid "Query status"
+msgstr ""
+
+msgid "Bus information"
+msgstr ""
+
+msgid "Driver"
+msgstr ""
+
+msgid "Collection scope"
+msgstr ""
+
+msgid "Coverage"
+msgstr ""
+
+msgid ""
+"This capture node and current media pipeline. No capture or configuration "
+"changes. Reported modes do not guarantee throughput or compatibility with "
+"other simultaneous streams."
+msgstr ""
+
+msgid "Format, size and frame rate combinations"
+msgstr ""
+
+msgid "Capture queue"
+msgstr ""
+
+msgid "Frame rates / intervals"
+msgstr ""
+
+msgid "Pixel format"
+msgstr ""
+
+msgid "Resolution / range"
+msgstr ""
+
+msgid " (big endian)"
+msgstr ""
+
+msgid " (compressed)"
+msgstr ""
+
+msgid " (emulated, reported by driver)"
+msgstr ""
+
+msgid "%1 × %2"
+msgstr ""
+
+msgid "%1–%2 × %3–%4 pixels"
+msgstr ""
+
+msgid " (continuous)"
+msgstr ""
+
+msgid " (steps: %1 × %2 pixels)"
+msgstr ""
+
+msgid "Not enumerated: intervals depend on the exact size"
+msgstr ""
+
+msgid "%1 fps (%2 s)"
+msgstr ""
+
+msgid "%1–%2 fps; intervals %3–%4 s"
+msgstr ""
+
+msgid " (interval step: %1 s)"
+msgstr ""
+
+msgid "Multiple planes"
+msgstr ""
+
+msgid "Single plane"
+msgstr ""
+
+msgid ""
+"Intervals queried only for this pixel format and exact discrete size. Ranges "
+"are not expanded."
+msgstr ""
+
+msgid "Mode %1"
+msgstr ""
+
+msgid "%1 bits per pixel"
+msgstr ""
+
+msgid "%1 Hz"
+msgstr ""
+
+msgid "%1° counterclockwise"
+msgstr ""
+
+msgid "0°"
+msgstr ""
+
+msgid "X and Y axes"
+msgstr ""
+
+msgid "X axis"
+msgstr ""
+
+msgid "Y axis"
+msgstr ""
+
+msgid "Vertical axis"
+msgstr ""
+
+msgid "Custom transform"
+msgstr ""
+
+msgid "%1×"
+msgstr ""
+
+msgid "X: %1×, Y: %2×"
+msgstr ""
+
+msgid " (derived)"
+msgstr ""
+
+msgid " (integer buffer scale)"
+msgstr ""
+
+msgid "Monitor hardware (reported)"
+msgstr ""
+
+msgid "Decoded by libdisplay-info"
+msgstr ""
+
+msgid "Decoded with conformance warnings"
+msgstr ""
+
+msgid "EDID decoding unavailable: build with libdisplay-info support"
+msgstr ""
+
+msgid "Unsupported EDID version: %1"
+msgstr ""
+
+msgid "Malformed EDID (invalid header, length, checksum or parser rejection)"
+msgstr ""
+
+msgid "Monitor report changed during collection; reload properties"
+msgstr ""
+
+msgid "Descriptor"
+msgstr ""
+
+msgid "EDID version"
+msgstr ""
+
+msgid "Manufacturer code"
+msgstr ""
+
+msgid "Model"
+msgstr ""
+
+msgid "Product code"
+msgstr ""
+
+msgid "Serial number"
+msgstr ""
+
+msgid "Image dimensions"
+msgstr ""
+
+msgid "%1 × %2 cm"
+msgstr ""
+
+msgid "Conformance warnings"
+msgstr ""
+
+msgid "Monitor input (reported)"
+msgstr ""
+
+msgid "Signal type"
+msgstr ""
+
+msgid "Analog"
+msgstr ""
+
+msgid "Digital"
+msgstr ""
+
+msgid "Input interface"
+msgstr ""
+
+msgid "Declared color depth"
+msgstr ""
+
+msgid "%1 bits per color component"
+msgstr ""
+
+msgid "Kernel-reported modes"
+msgstr ""
+
+msgid "Mode names"
+msgstr ""
+
+msgid "Scope"
+msgstr ""
+
+msgid ""
+"Cached mode names; refresh rates are not exposed here. The list may include "
+"driver additions or restrictions and does not guarantee monitor capabilities."
+msgstr ""
+
+msgid "Desktop session"
+msgstr ""
+
+msgid "Configuration"
+msgstr ""
+
+msgid "Backend"
+msgstr ""
+
+msgid "Output"
+msgstr ""
+
+msgid "No active mode"
+msgstr ""
+
+msgid "Reported by desktop server"
+msgstr ""
+
+msgid ""
+"Read-only session query. Unavailable can mean missing runtime libraries, an "
+"output not exposed by this session, or a protocol without usable output "
+"names."
+msgstr ""
+
+msgid "Active display mode"
+msgstr ""
+
+msgid "Resolution"
+msgstr ""
+
+msgid "Desktop color depth"
+msgstr ""
+
+msgid "Refresh rate"
+msgstr ""
+
+msgid "Orientation and scale"
+msgstr ""
+
+msgid "Rotation"
+msgstr ""
+
+msgid "Reflection"
+msgstr ""
+
+msgid "Output scale"
+msgstr ""
+
+msgid "%1 (%2)"
+msgstr ""
+
+msgid "Connection"
+msgstr ""
+
+msgid "USB version"
+msgstr ""
+
+msgid ""
+"USB specification version reported by the device descriptor; not the port's "
+"maximum capability."
+msgstr ""
+
+msgid "Connection speed"
+msgstr ""
+
+msgid ""
+"Kernel-reported link rate, not measured throughput. For root hubs this "
+"describes the USB bus."
+msgstr ""
+
+msgid "Power declarations"
+msgstr ""
+
+msgid "Bus-powered"
+msgstr ""
+
+msgid "Self-powered"
+msgstr ""
+
+msgid "Not supported"
+msgstr ""
+
+msgid "Supported"
+msgstr ""
+
+msgid "Power source"
+msgstr ""
+
+msgid "Declared maximum current"
+msgstr ""
+
+msgid "Remote wakeup capability"
+msgstr ""
+
+msgid "Active configuration"
+msgstr ""
+
+msgid "Unconfigured"
+msgstr ""
+
+msgid "Available configurations"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "Not provided"
+msgstr ""
+
+msgid "Interface count"
+msgstr ""
+
+msgid "None observed"
+msgstr ""
+
+msgid "Interface %1"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Number (hex)"
+msgstr ""
+
+msgid "Alternate setting"
+msgstr ""
+
+msgid "Function class"
+msgstr ""
+
+msgid "Subclass (hex)"
+msgstr ""
+
+msgid "Protocol (hex)"
+msgstr ""
+
+msgid "Bound driver"
+msgstr ""
+
+msgid "Unbound"
+msgstr ""
+
+msgid "(empty)"
+msgstr ""
+
+msgid "Malformed reported value: %1"
+msgstr ""
+
+msgid "Unavailable (%1)"
+msgstr ""
+
+msgid "%1 (PCIe Gen %2)"
+msgstr ""
+
+msgid "Unavailable (kernel reports unknown width: %1)"
+msgstr ""
+
+msgid "Unavailable (reported width: %1)"
+msgstr ""
+
+msgid "x%1 (%2 lanes)"
+msgstr ""
+
+msgid "Malformed PCI capability data"
+msgstr ""
+
+msgid "Incomplete PCI configuration data"
+msgstr ""
+
+msgid "PCIe endpoint"
+msgstr ""
+
+msgid "Legacy PCIe endpoint"
+msgstr ""
+
+msgid "Root port"
+msgstr ""
+
+msgid "Upstream switch port"
+msgstr ""
+
+msgid "Downstream switch port"
+msgstr ""
+
+msgid "PCIe-to-PCI/PCI-X bridge"
+msgstr ""
+
+msgid "PCI/PCI-X-to-PCIe bridge"
+msgstr ""
+
+msgid "Root Complex Integrated Endpoint"
+msgstr ""
+
+msgid "Root Complex Event Collector"
+msgstr ""
+
+msgid "Unrecognized PCIe device type: %1"
+msgstr ""
+
+msgid "Connection type"
+msgstr ""
+
+msgid "Access"
+msgstr ""
+
+msgid ""
+"Run the application as root or with sudo to read this device's PCIe "
+"connection type."
+msgstr ""
+
+msgid "PCIe link"
+msgstr ""
+
+msgid ""
+"Not applicable — integrated into the root complex; no external PCIe link."
+msgstr ""
+
+msgid ""
+"Current link reported for this device; an on-demand reading, not measured "
+"throughput or a fault verdict."
+msgstr ""
+
+msgid "Current link"
+msgstr ""
+
+msgid "Link width"
+msgstr ""
+
+msgid ""
+"Maximum capability reported for this device, not the slot or entire upstream "
+"path. Speed and width maxima are separate declarations."
+msgstr ""
+
+msgid "Device capability"
+msgstr ""
+
+msgid "Maximum link speed"
+msgstr ""
+
+msgid "Maximum link width"
+msgstr ""
+
+msgid "Interpretation"
+msgstr ""
+
+msgid "Not assessed; upstream links may impose additional limits."
+msgstr ""
+
+msgid "Upstream path"
+msgstr ""
+
+msgid "Current vs. maximum"
+msgstr ""
+
+msgid ""
+"A lower current link speed or width is not automatically a fault. Power "
+"management and topology can explain differences."
+msgstr ""
+
+msgid "Not reported"
+msgstr ""
+
+msgid "Unknown (reported)"
+msgstr ""
+
+msgid "Charging"
+msgstr ""
+
+msgid "Discharging"
+msgstr ""
+
+msgid "Not charging"
+msgstr ""
+
+msgid "Full"
+msgstr ""
+
+msgid "Unavailable (reported value: 0)"
+msgstr ""
+
+msgid "Current state"
+msgstr ""
+
+msgid "Battery type or presence changed during collection; reload properties."
+msgstr ""
+
+msgid "Malformed battery presence value: %1"
+msgstr ""
+
+msgid "Collection status"
+msgstr ""
+
+msgid "Supply type"
+msgstr ""
+
+msgid "Absent"
+msgstr ""
+
+msgid "Present"
+msgstr ""
+
+msgid "Battery presence"
+msgstr ""
+
+msgid "Charge percentage"
+msgstr ""
+
+msgid "Voltage"
+msgstr ""
+
+msgid "Current"
+msgstr ""
+
+msgid ""
+"Driver-reported instantaneous current; the reported sign is preserved. "
+"Charging state is reported separately."
+msgstr ""
+
+msgid "Power"
+msgstr ""
+
+msgid ""
+"Driver-reported instantaneous power; not calculated from voltage and current."
+msgstr ""
+
+msgid "Unavailable — requires compatible full and design readings"
+msgstr ""
+
+msgid "Unavailable — requires positive full and design readings"
+msgstr ""
+
+msgid "%1 % (estimate)"
+msgstr ""
+
+msgid "Charge capacity"
+msgstr ""
+
+msgid "Energy capacity"
+msgstr ""
+
+msgid "Design capacity"
+msgstr ""
+
+msgid "Last full-charge capacity"
+msgstr ""
+
+msgid ""
+"Firmware-reported learned full capacity; it can depend on temperature, age "
+"and calibration."
+msgstr ""
+
+msgid "Remaining capacity"
+msgstr ""
+
+msgid "Estimated capacity retention"
+msgstr ""
+
+msgid ""
+"100 × full / design using matching units; not a complete battery health "
+"verdict. Values above 100% are not clamped."
+msgstr ""
+
+msgid "Capacity"
+msgstr ""
+
+msgid "Reported capacities"
+msgstr ""
+
+msgid "Unavailable — no energy or charge capacity attributes exposed"
+msgstr ""
+
+msgid "Battery information"
+msgstr ""
+
+msgid "Cycle count"
+msgstr ""
+
+msgid ""
+"Reported full charge/discharge cycles. The kernel ABI defines zero as "
+"unavailable."
+msgstr ""
+
+msgid "Chemistry"
+msgstr ""
+
+msgid "Unassigned"
+msgstr ""
+
+msgid "Address unavailable (zeroed or masked)"
+msgstr ""
+
+msgid "BAR %1"
+msgstr ""
+
+msgid "Expansion ROM"
+msgstr ""
+
+msgid "PCI resource %1"
+msgstr ""
+
+msgid "Flags: %1"
+msgstr ""
+
+msgid "Reported irq attribute; active mode not established"
+msgstr ""
+
+msgid "PnP device disabled"
+msgstr ""
+
+msgid "Resource metadata"
+msgstr ""
+
+msgid "Read or parse failed"
+msgstr ""
+
+msgid "Represented by"
+msgstr ""
+
+msgid "Grouped records"
+msgstr ""
+
+msgid "PnP device state"
+msgstr ""
+
+msgid "Partition"
+msgstr ""
+
+msgid "Device mapper"
+msgstr ""
+
+msgid "RAID"
+msgstr ""
+
+msgid "Logical volume"
+msgstr ""
+
+msgid "Volume group"
+msgstr ""
+
+msgid "Block device"
+msgstr ""
+
+msgid "Conflicting metadata:"
+msgstr ""
+
+msgid "%1 milliseconds"
+msgstr ""
+
+msgid "%1 sectors"
+msgstr ""
+
+msgid "Unavailable (unknown unit %1)"
+msgstr ""
+
+msgid "Unnamed attribute"
+msgstr ""
+
+msgid "ATA SMART attributes"
+msgstr ""
+
+msgid "NVMe health details"
+msgstr ""
+
+msgid "Temperature sensors"
+msgstr ""
+
+msgid "Temperature sensor %1"
+msgstr ""
+
+msgid "Health"
+msgstr ""
+
+msgid "Health and endurance"
+msgstr ""
+
+msgid "Usage"
+msgstr ""
+
+msgid "Errors"
+msgstr ""
+
+msgid "Temperatures"
+msgstr ""
+
+msgid "Device"
+msgstr ""
+
+msgid "Associated drive"
+msgstr ""
+
+msgid "Cached drive health"
+msgstr ""
+
+msgid "Cached health"
+msgstr ""
+
+msgid "No supported cached drive health in this snapshot"
+msgstr ""
+
+msgid "Source: %1"
+msgstr ""
+
+msgid ""
+"%1 (ID %2)\n"
+"Normalized value: %3\n"
+"Worst normalized value: %4\n"
+"Threshold: %5\n"
+"Interpreted value: %6\n"
+"Flags: %7\n"
+"Source: %8"
+msgstr ""
+
+msgid "Operating System"
+msgstr ""
+
+msgid "Hardware"
+msgstr ""
+
+msgid "Processor"
+msgstr ""
+
+msgid "RAM/Memory"
+msgstr ""
+
+msgid ""
+"Firmware-reported records; these do not establish removable modules, "
+"physical slots, memory channels, upgradeability or active ECC. Transfer "
+"rates are firmware declarations, not live measurements."
+msgstr ""
+
+msgid "Unknown (no explicit presence flag)"
+msgstr ""
+
+msgid "Device reported present"
+msgstr ""
+
+msgid "No device reported present"
+msgstr ""
+
+msgid "%1 MT/s"
+msgstr ""
+
+msgid "No PCI display controller reported"
+msgstr ""
+
+msgid "GPU [%1]"
+msgstr ""
+
+msgid "Capability: Not exposed by kernel"
+msgstr ""
+
+msgid "Capability: Supported"
+msgstr ""
+
+msgid "BAR %1 — Current allocation: %2; supported sizes: %3"
+msgstr ""
+
+msgid "BIOS setting: Unknown"
+msgstr ""
+
+msgid "Unknown (no hypervisor identity reported)"
+msgstr ""
+
+msgid "No memory-device records reported"
+msgstr ""
+
+msgid "Memory device %1 (firmware record %2)"
+msgstr ""
+
+msgid ""
+"Owner: %1\n"
+"Issuer: %2\n"
+"Expires: %3"
+msgstr ""
+
+msgid "No X.509 certificates in the exposed MOK list"
+msgstr ""
+
+msgid "%1 non-certificate signatures omitted"
+msgstr ""
+
+msgid "UEFI"
+msgstr ""
+
+msgid "UEFI not exposed (legacy boot or restricted environment)"
+msgstr ""
+
+msgid "Reported hypervisor: %1"
+msgstr ""
+
+msgid "%1 GiB"
+msgstr ""
+
+msgid " (%1 MiB is system reserved)"
+msgstr ""
+
+msgid "%1 days, %2 hours, %3 minutes"
+msgstr ""
+
+msgid "Logical CPUs %1: %2"
+msgstr ""
+
+msgid "data"
+msgstr ""
+
+msgid "instruction"
+msgstr ""
+
+msgid "unified"
+msgstr ""
+
+msgid "%1 %2: %3 (%4 unique instances)"
+msgstr ""
+
+msgid ""
+"Firmware SecureBoot state; does not establish shim validation or kernel "
+"lockdown policy."
+msgstr ""
+
+msgid ""
+"GPU capability and current OS resource allocation are separate from the "
+"firmware setting. A small BAR is not proof of disabled ReBAR; a large BAR is "
+"not proof of driver use. No portable BIOS Enabled/Disabled value is "
+"inferred. Only sysfs metadata is read; BAR memory is never accessed."
+msgstr ""
+
+msgid ""
+"Kernel-exposed instruction-set and CPU-feature flags for processors listed "
+"in /proc/cpuinfo. These include non-instruction features and may be limited "
+"by the kernel, operating system or hypervisor. Different reported feature "
+"lists remain separate; this is not a complete raw hardware capability "
+"inventory."
+msgstr ""
+
+msgid ""
+"System reserved is reported physical RAM minus Linux MemTotal. It includes "
+"all memory unavailable to Linux, not just firmware reservations. It is "
+"omitted if physical capacity is unavailable or smaller than usable RAM."
+msgstr ""
+
+msgid "Memory device %1"
+msgstr ""
+
+msgid ""
+"Exposed runtime MOK certificates. Issuer and expiration are certificate "
+"metadata, not verification of the signer or proof that this key signed the "
+"running kernel. Dates are UTC. Firmware db certificates and pending "
+"enrollments are not included."
+msgstr ""
+
+msgid "%1 UTC"
+msgstr ""
+
+msgid "MOK Certificate"
+msgstr ""
+
+msgid "MOK Certificate %1"
+msgstr ""
+
+msgid "Same as owner"
+msgstr ""
+
+msgid "Owner:"
+msgstr ""
+
+msgid "Issuer:"
+msgstr ""
+
+msgid "Expires:"
+msgstr ""
+
+msgid "MOK certificates"
+msgstr ""
+
+msgid "This computer"
+msgstr ""
+
+msgid "Subsystem"
+msgstr ""
+
+msgid "Raw name source"
+msgstr ""
+
+msgid "Raw name"
+msgstr ""
+
+msgid "Ancestor retained for connection context"
+msgstr ""
+
+msgid "%1 (namespace %2)"
+msgstr ""
+
+msgid "%1: %2 (driver)"
+msgstr ""
+
+msgid "%1: %2"
+msgstr ""
+
+msgid "Device: %1"
+msgstr ""
+
+msgid "Owning module / built-in status undetermined"
+msgstr ""
+
+msgid "%1 (kernel module)"
+msgstr ""
+
+msgid "Parent-device driver: %1 — %2"
+msgstr ""
+
+msgid "%1 — Properties"
+msgstr ""
+
+msgid "Loading properties…"
+msgstr ""
+
+msgid "Reload properties"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "ℹ️ Live udev events since the application started"
+msgstr ""
+
+msgid "Event type"
+msgstr ""
+
+msgid "Observed time"
+msgstr ""
+
+msgid "Copy selection"
+msgstr ""
+
+msgid "Copy all events"
+msgstr ""
+
+msgid "Properties could not be refreshed: %1. Showing the previous snapshot."
+msgstr ""
+
+msgid ""
+"Device removed or replaced. This dialog is a read-only snapshot; close it "
+"and reopen Properties for the current device."
+msgstr ""
+
+msgid "General"
+msgstr ""
+
+msgid ""
+"Addresses belong to the application's network namespace. Reload properties "
+"to refresh. Hardware MAC is the permanent address reported by the driver. An "
+"overridden MAC is the current address when it differs from the permanent "
+"address, or Linux reports a random, inherited or explicitly set address."
+msgstr ""
+
+msgid "Copy network properties"
+msgstr ""
+
+msgid "Network"
+msgstr ""
+
+msgid "ℹ️ Network interface snapshot"
+msgstr ""
+
+msgid ""
+"Monitor information is reported by this connector’s cached EDID and kernel "
+"mode list; it does not guarantee capabilities. Active settings are shown "
+"separately below. Resolution and refresh rate describe the configured "
+"physical mode. Desktop color depth is not the panel or link depth. Wayland "
+"scale derived from logical size may include rounding; integer scale is a "
+"fallback. Reload properties to refresh. Unmatched or ambiguous connector "
+"names remain unavailable."
+msgstr ""
+
+msgid "Copy display properties"
+msgstr ""
+
+msgid "Display"
+msgstr ""
+
+msgid "ℹ️ Monitor hardware and display configuration snapshot"
+msgstr ""
+
+msgid ""
+"Queries only: no capture, format changes or measured frame rates. Reload "
+"properties to refresh. Rows preserve the format, size and frame interval "
+"relationship. Size ranges do not imply a common rate list."
+msgstr ""
+
+msgid "Camera"
+msgstr ""
+
+msgid "Copy camera properties"
+msgstr ""
+
+msgid "ℹ️ Driver-reported camera capabilities snapshot"
+msgstr ""
+
+msgid ""
+"Power information is declared by the active USB configuration, not measured "
+"consumption. USB version and speed are also available as raw values on "
+"Details. Reload properties to refresh."
+msgstr ""
+
+msgid "Copy USB properties"
+msgstr ""
+
+msgid "USB"
+msgstr ""
+
+msgid "ℹ️ USB configuration snapshot"
+msgstr ""
+
+msgid ""
+"Current link readings can reflect power management and topology; a lower "
+"speed is not a fault verdict. Device maxima do not establish the capacity of "
+"the upstream path. Reading these sysfs attributes may temporarily runtime-"
+"resume the device. Reload properties to refresh."
+msgstr ""
+
+msgid "Copy PCIe properties"
+msgstr ""
+
+msgid "PCIe"
+msgstr ""
+
+msgid "ℹ️ PCIe link snapshot for this device"
+msgstr ""
+
+msgid ""
+"Readings are reported by the kernel and battery firmware. Capacity retention "
+"is an estimate from compatible full/design values, not a complete health "
+"assessment. Energy and charge units remain separate. Reload properties to "
+"refresh; no background monitoring or battery settings are changed."
+msgstr ""
+
+msgid "Copy Battery properties"
+msgstr ""
+
+msgid "ℹ️ Battery snapshot for this device"
+msgstr ""
+
+msgid "Details"
+msgstr ""
+
+msgid "Events"
+msgstr ""
+
+msgid "Resources"
+msgstr ""
+
+msgid "Show _advanced properties"
+msgstr ""
+
+msgid "_Property:"
+msgstr ""
+
+msgid "Copy value"
+msgstr ""
+
+msgid "Copy all values"
+msgstr ""
+
+msgid "Resource type"
+msgstr ""
+
+msgid "Setting"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "PnP device state: %1"
+msgstr ""
+
+msgid "Copy all resources"
+msgstr ""
+
+msgid ""
+"Read-only metadata snapshot. Each entity is a separate layer; capacities are "
+"not added. Kernel and UDisks2 block records are merged only by their exact "
+"device-number mapping. Source paths remain in tooltips and copied text. Deep "
+"search includes native metadata only."
+msgstr ""
+
+msgid "ℹ️ Storage snapshot for this device"
+msgstr ""
+
+msgid "Copy storage overview"
+msgstr ""
+
+msgid "Storage"
+msgstr ""
+
+msgid "Content"
+msgstr ""
+
+msgid "Device / label"
+msgstr ""
+
+msgid "Layer"
+msgstr ""
+
+msgid "Mount points"
+msgstr ""
+
+msgid "No related volume metadata available."
+msgstr ""
+
+msgid "ℹ️ Related volumes and mounts"
+msgstr ""
+
+msgid ""
+"Related volumes may span several drives. Mount points cover only the "
+"application mount namespace. No filesystem is probed, mounted or unlocked."
+msgstr ""
+
+msgid "Copy selected volume"
+msgstr ""
+
+msgid "Copy all volumes"
+msgstr ""
+
+msgid "Volumes"
+msgstr ""
+
+msgid "Cached health unavailable."
+msgstr ""
+
+msgid "Flags"
+msgstr ""
+
+msgid "ID"
+msgstr ""
+
+msgid "Interpreted value"
+msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "Threshold"
+msgstr ""
+
+msgid "Worst"
+msgstr ""
+
+msgid "ℹ️ Cached drive health"
+msgstr ""
+
+msgid ""
+"Cached UDisks2 health only, separate from device operational status. Reload "
+"does not request SMART updates or self-tests. Missing evidence is "
+"unavailable; no reported warning does not guarantee health. Related drives "
+"are shown separately."
+msgstr ""
+
+msgid "_Drive:"
+msgstr ""
+
+msgid "Copy selected drive health"
+msgstr ""
+
+msgid "Copy all drive health"
+msgstr ""
+
+msgid "System Information"
+msgstr ""
+
+msgid "Copy all"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Refreshing…"
+msgstr ""
+
+msgid "Not collected"
+msgstr ""
+
+msgid "System _Information"
+msgstr ""
+
+msgid "_Quit"
+msgstr ""
+
+msgid "_File"
+msgstr ""
+
+msgid "_Refresh"
+msgstr ""
+
+msgid "_Properties"
+msgstr ""
+
+msgid "_Action"
+msgstr ""
+
+msgid "_Filter"
+msgstr ""
+
+msgid "Show _all devices"
+msgstr ""
+
+msgid "Expand all"
+msgstr ""
+
+msgid "Collapse all"
+msgstr ""
+
+msgid "_View"
+msgstr ""
+
+msgid "_About"
+msgstr ""
+
+msgid "_Help"
+msgstr ""
+
+msgid "Deep search"
+msgstr ""
+
+msgid ""
+"Search device identifiers, generic properties, resources and native storage "
+"metadata. Specialized hardware-tab information is not fully indexed. Refresh "
+"updates cached metadata."
+msgstr ""
+
+msgid "_Filter:"
+msgstr ""
+
+msgid "Show System Information"
+msgstr ""
+
+msgid "Re-enumerate existing kernel devices; does not rescan buses."
+msgstr ""
+
+msgid "Properties"
+msgstr ""
+
+msgid "QLinuxDeviceManager"
+msgstr ""
+
+msgid " — Administrative mode"
+msgstr ""
+
+msgid "All device metadata"
+msgstr ""
+
+msgid "%1 records unavailable or removed during enumeration"
+msgstr ""
+
+msgid "Initializing…"
+msgstr ""
+
+msgid "Refreshing devices…"
+msgstr ""
+
+msgid "%1 shown / %2 discovered"
+msgstr ""
+
+msgid " — Deep search: %1/%2"
+msgstr ""
+
+msgid "; %1 property reads unavailable"
+msgstr ""
+
+msgid " — Matched: %1"
+msgstr ""
+
+msgid ""
+"A read-only Linux hardware viewer.\n"
+"Categories are application groupings, not native Linux device classes.\n"
+"Device presence does not establish hardware health."
+msgstr ""
+
+msgid "Waiting for device metadata reads to finish…"
+msgstr ""

@@ -1,0 +1,49 @@
+name: Rust
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: fmt, clippy, test (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libgtk-4-dev libudev-dev libkmod-dev libdisplay-info-dev \
+            libv4l-dev libwayland-dev libxcb-randr0-dev clang libclang-dev gettext desktop-file-utils \
+            xvfb at-spi2-core
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Unit and integration tests
+        run: cargo test --workspace --locked --exclude qldm-gtk
+
+      # The UI smoke test needs a display; xvfb provides an X11 one.
+      - name: UI smoke test
+        run: xvfb-run -a cargo test -p qldm-gtk --locked --test ui_smoke
+
+      - name: Desktop entry and message catalogue
+        run: |
+          desktop-file-validate packaging/io.github.birdie-github.QLinuxDeviceManager.desktop
+          po/update-pot.sh
+          git diff --exit-code -I POT-Creation-Date po/qlinuxdevicemanager.pot
+
+      - name: Install into a staging directory
+        run: make install PREFIX=/usr DESTDIR="$PWD/stage"

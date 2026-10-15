@@ -11,7 +11,7 @@ does not upload it.
 ![QLinuxDeviceManager showing the Linux hardware device tree](screenshots/main-window.webp)
 
 [More screenshots](SCREENSHOTS.md) ·
-[Download an AppImage](https://github.com/birdie-github/QLinuxDeviceManager/releases) ·
+[Releases](https://github.com/birdie-github/QLinuxDeviceManager/releases) ·
 [Build from source](doc/implementation.md#build-and-installation)
 
 ## What you can see
@@ -64,33 +64,23 @@ field in specialized hardware tabs.
 - **Live monitoring** - no need to restart the app to discover newly attached devices.
 - **Can show hidden or virtual devices**.
 
-## Download and run on Linux
+## Build and run on Linux
 
-An **x86_64 AppImage** is available at [the releases](https://github.com/birdie-github/QLinuxDeviceManager/releases).
-
-In the folder containing the extracted AppImage, run:
+The application is a Rust program using GTK4. Build it from a source checkout:
 
 ```sh
-chmod +x QLinuxDeviceManager-*.AppImage
-./QLinuxDeviceManager-*.AppImage
+cargo build --release
+./target/release/qldm-gtk
 ```
 
-The AppImage includes Qt and support for X11 and Wayland. It is built on Ubuntu
-24.04; compatibility with older distributions is not guaranteed. Workflow downloads
-expire after 14 days.
-
-If it fails to start because FUSE is unavailable, try:
-
-```sh
-./QLinuxDeviceManager-*.AppImage --appimage-extract-and-run
-```
-
-To compile and install the application yourself, see the
-[build instructions](doc/implementation.md#build-and-installation).
+or install it (with the camera helper, desktop entry, icons and translations) via
+`sudo make install PREFIX=/usr/local`. See the
+[build instructions](doc/implementation.md#build-and-installation) for dependencies and
+[packaging notes](packaging/build-rust.md) for Flatpak and AppImage.
 
 ## Getting started
 
-Launch the AppImage, or open **QLinuxDeviceManager** from your application menu
+Launch `qlinuxdevicemanager`, or open **QLinuxDeviceManager** from your application menu
 if installed. The installed command is `qlinuxdevicemanager`.
 
 1. Expand a category in the device tree and select a device.

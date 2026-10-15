@@ -1,0 +1,15 @@
+[package]
+name = "qldm-gtk"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+qldm-core = { path = "../qldm-core" }
+gtk = { package = "gtk4", version = "0.9", features = ["v4_12"] }
+async-channel = "2"
+libc = "0.2"
+
+[[test]]
+name = "ui_smoke"
+harness = false

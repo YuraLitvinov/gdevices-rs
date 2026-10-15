@@ -1,0 +1,29 @@
+[package]
+name = "qldm-core"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+udev = { version = "0.9", features = ["hwdb"] }
+libc = "0.2"
+libloading = { version = "0.8", optional = true }
+zbus = { version = "5", optional = true }
+serde_json = "1"
+x509-parser = "0.18"
+x11rb = { version = "0.13", features = ["randr", "render"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "unstable"] }
+
+[features]
+default = ["kmod", "udisks2", "display-info"]
+# Module descriptions via libkmod, opened at run time; absence only disables them.
+kmod = ["dep:libloading"]
+# Cached UDisks2 storage metadata over the system bus (read-only; never starts the daemon).
+udisks2 = ["dep:zbus"]
+# Monitor EDID name/serial decoding via libdisplay-info, opened at run time.
+display-info = ["dep:libloading"]
+
+[dev-dependencies]
+tempfile = "3"
+libc = "0.2"

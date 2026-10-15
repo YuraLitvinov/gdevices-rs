@@ -13,13 +13,10 @@
     "license": "GPL-3.0"
   },
   "resources": {
-    "embedded": "resources/embedded",
-    "root": "resources/external",
-    "translations": "translations"
+    "root": "resources/external"
   },
   "platform": {
     "os": "Linux",
-    "minimum_qt": "6.2",
-    "cpp_standard": 17
+    "language": "Rust"
   }
 }

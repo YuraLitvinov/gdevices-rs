@@ -4,7 +4,8 @@ This document covers data sources, collection limits, interpretation rules,
 optional dependencies and building from source. For an introduction, download
 instructions and everyday use, see the [README](../README.md).
 
-The application uses C++17 and Qt 6 Widgets, with libudev for device discovery,
+The application is written in Rust with GTK4 (a `qldm-core` library that knows nothing about the
+toolkit, and a `qldm-gtk` front end), with libudev for device discovery,
 sysfs and procfs for local kernel metadata, and optional UDisks2 storage metadata.
 
 Related reference: [architecture and refresh semantics](architecture.md).
@@ -18,7 +19,7 @@ Related reference: [architecture and refresh semantics](architecture.md).
 - [System information](#system-information)
 - [Live device events](#live-device-events)
 - [UEFI firmware variables](#uefi-firmware-variables)
-- [Linux AppImage packaging](#linux-appimage-packaging)
+- [Packaging](#packaging)
 - [Build and installation](#build-and-installation)
 - [Permissions and settings](#permissions-and-settings)
 
@@ -255,8 +256,8 @@ selected connector's cached `edid` and `modes` sysfs files. Optional
 **libdisplay-info >= 0.1.1** decodes reported manufacturer/model, product code,
 serial, image dimensions and digital input type/color depth. No EDID decoder is
 bundled: without this library, decoding is explicitly unsupported while kernel
-mode names and desktop settings remain available. Configure with
-`-DDISPLAY_INFO=OFF` to disable it; CMake reports whether decoding is enabled.
+mode names and desktop settings remain available. The library is loaded at
+run time; build `qldm-core` without its `display-info` feature to omit the loader.
 
 Reads run only in the properties worker on demand, never force connector detection,
 change settings or poll in the background. EDID is limited to 32 KiB and mode
@@ -290,7 +291,7 @@ Wayland output protocols do not expose it, so it remains unavailable. Output sca
 is the X11 RandR transform (framebuffer pixels per output pixel, excluding desktop
 DPI) or the Wayland rotated mode/logical-size ratio. The latter is marked derived
 because logical dimensions may be rounded. Without logical-size information,
-Wayland reports its integer buffer scale explicitly. Qt application scaling is
+Wayland reports its integer buffer scale explicitly. Toolkit application scaling is
 excluded; arbitrary X11 transforms are shown as custom instead of inventing a
 single scale factor.
 
@@ -387,7 +388,7 @@ and subvolume mounts can be distinguished. No observed mount is not proof that a
 volume is unused elsewhere. No filesystem probing, mounting or unlocking occurs.
 
 Optional UDisks2 support supplements native metadata when the service is already
-running and accessible. Missing services, denied access and builds without QtDBus
+running and accessible. Missing services, denied access and builds without the `udisks2` feature
 retain native storage viewing. The UDisks2 removable-drive hint is distinct from
 the kernel's removable-media flag.
 
@@ -587,87 +588,60 @@ certificates (owner, issuer and expiration in UTC). This is certificate metadata
 not a check of the running kernel's signer or certificate trust. Reading MOK data
 may require permissions; unavailable data is shown explicitly. The kernel's MOK
 table is preferred, with efivarfs as a fallback. Oversized or split fallback lists
-are reported as errors rather than displaying a partial list. Qt's TLS backend
-must be installed to decode X.509 certificates.
+are reported as errors rather than displaying a partial list. X.509 certificates are decoded in-process
+(no network access, no TLS library needed).
 
-## Linux AppImage packaging
+## Packaging
 
-The [Linux AppImage workflow](https://github.com/birdie-github/QLinuxDeviceManager/actions/workflows/ci.yml)
-packages an x86_64 AppImage on pushes, pull requests and manual runs. Download the
-artifact from a successful run and extract the ZIP, then launch it:
-
-```sh
-chmod +x QLinuxDeviceManager-*.AppImage
-./QLinuxDeviceManager-*.AppImage
-```
-
-The package includes Qt 6.8, X11/Wayland platform plugins, application icons and
-translations, and enables libkmod, QtDBus and libdisplay-info monitor decoding. It is built on Ubuntu 24.04;
-older distributions are not guaranteed to be compatible. The host still provides
-the Linux kernel, device metadata and optional UDisks2 service.
-
-If FUSE is unavailable, launch with `--appimage-extract-and-run`. Workflow artifacts
-are retained for 14 days; they are not automatically published as release assets.
+Installation layout, translations, CI, and Flatpak/AppImage notes are in
+[packaging/build-rust.md](../packaging/build-rust.md). A C++ parity record of the port is in
+[parity-checklist.md](parity-checklist.md).
 
 ## Build and installation
 
 Requirements:
 
-- Linux and a C++17 compiler.
-- CMake **3.19 or newer** and pkg-config.
-- Qt **6.8 or newer**, including Widgets and Network, and libudev development headers.
-  Qt Network is used locally to decode MOK certificates; this feature makes no network requests.
-- libv4l2 development headers/library (Fedora: **libv4l-devel**; Debian/Ubuntu: **libv4l-dev**).
+- Linux, a stable Rust toolchain (edition 2021) and pkg-config.
+- GTK **4.12 or newer** development files and libudev development headers.
+- `clang`/`libclang` (bindgen generates the V4L2 bindings at build time) and libv4l2 headers.
 - XCB RandR and Wayland client **1.20 or newer** development headers (runtime
   libraries are required only for the corresponding Display backend).
-- Optional QtDBus **6.8 or newer** for cached UDisks2 storage metadata.
-- Optional libkmod **30 or newer** for installed-module metadata and fallback names.
-- Optional libdisplay-info **0.1.1 or newer** for monitor EDID decoding.
-- Optional Qt Linguist tools **6.8 or newer** to build translation catalogs.
+- Optional at run time (loaded with `dlopen`, so not needed to build): libkmod **30 or newer**
+  for installed-module metadata and fallback names; libdisplay-info **0.1.1 or newer** for
+  monitor EDID decoding.
+- Optional UDisks2 service on the system bus for cached storage metadata (Cargo feature
+  `udisks2`, on by default).
+- Optional GNU gettext (`msgfmt`, `xgettext`) to build and update translation catalogues.
 
 Fedora packages:
 
 ```sh
-# Optional monitor EDID decoding: libdisplay-info-devel
-sudo dnf install gcc-c++ cmake make pkgconf-pkg-config qt6-qtbase-devel systemd-devel libv4l-devel libxcb-devel wayland-devel
-# Optional:
-sudo dnf install qt6-qttools-devel kmod-devel libdisplay-info-devel
+sudo dnf install rust cargo clang-devel pkgconf-pkg-config gtk4-devel systemd-devel libv4l-devel libxcb-devel wayland-devel gettext
 ```
 
 Debian/Ubuntu packages:
 
 ```sh
-# Optional monitor EDID decoding: libdisplay-info-dev (>= 0.1.1)
-sudo apt install g++ cmake make pkg-config qt6-base-dev libudev-dev libv4l-dev libxcb-randr0-dev libwayland-dev
-# Optional:
-sudo apt install qt6-tools-dev qt6-tools-dev-tools libkmod-dev libdisplay-info-dev
+sudo apt install cargo clang libclang-dev pkg-config libgtk-4-dev libudev-dev libv4l-dev libxcb-randr0-dev libwayland-dev gettext
 ```
-
-Check that your distribution's Qt packages meet the minimum version; older
-releases may require a newer Qt installation.
 
 Build and run from a source checkout:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-cmake --build build -j
-./build/qlinuxdevicemanager
+cargo build --release
+./target/release/qldm-gtk
 ```
 
-Install the executable, desktop entry, application icons and available translation catalogs:
+Install the executable, camera helper, desktop entry, icons and compiled translation catalogues:
 
 ```sh
-sudo cmake --install build --prefix /usr/local
+sudo make install PREFIX=/usr/local
 ```
 
-Use `-DKMOD=OFF` to omit libkmod or `-DUDISKS2=OFF` for a native-only storage build.
-Basic hardware viewing requires neither QtDBus nor UDisks2. The interface uses
-system-theme icons with Qt fallbacks and standard Qt X11/Wayland platform selection.
-The application window and About dialog use embedded application icons, available
-without installation. Installation supplies PNG sizes from 16 to 512 pixels and
-a scalable SVG in the standard `hicolor` icon theme for desktop launchers.
-The supplied interface is English; Qt's own dialogs use installed Qt translations
-when available.
+Build with `--no-default-features` on `qldm-core` to omit the UDisks2 client (native-only
+storage). Basic hardware viewing needs neither UDisks2 nor libkmod. The application window uses the
+system icon theme and GTK's standard X11/Wayland backend selection. The supplied interface is
+English; the gettext hook translates it when a catalogue for the user's locale is installed.
 
 ## Permissions and settings
 
@@ -676,7 +650,8 @@ as unavailable or permission denied; no passwords or administrative privileges
 are required for ordinary viewing. The application does not upload hardware
 information or run a separate diagnostic daemon.
 
-Settings use the normal Qt configuration location under `QLinuxDeviceManager`.
+Settings are stored in `settings.conf` under `$XDG_CONFIG_HOME/QLinuxDeviceManager` (default
+`~/.config/QLinuxDeviceManager`); settings from the earlier Qt version are not migrated.
 If launched as root, the window identifies administrative mode and settings use
 `/root/.config`, `/root/.local/share` and `/root/.cache`. Root launch requires an
 already-authorized display/session environment; the application does not change

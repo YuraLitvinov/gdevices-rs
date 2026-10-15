@@ -264,7 +264,7 @@ The existing virtual/internal visibility setting applies before both searches.
 Deep search includes generic General, Driver and Details text (advanced entries as
 well), provenance, inventory properties/attributes, grouped-record paths, EFI
 hex/ASCII and resource types, ranges, flags and IRQs. The Properties text
-formatter is shared and uses Qt Core only. Known numeric identifiers and
+formatter is shared and has no toolkit dependency. Known numeric identifiers and
 resource numbers also get hexadecimal and decimal aliases; arbitrary product
 names and serial strings are not parsed as numbers. Only metadata already
 exposed by this application is collected; search does not walk arbitrary sysfs
@@ -275,7 +275,7 @@ discarded. Specialized hardware tabs are not fully indexed; camera capabilities,
 desktop display configuration and UDisks2 health are excluded. Search results are
 observations, not live device state.
 
-A single additional serial QThread collects metadata using the same pinned,
+A single additional serial worker thread collects metadata using the same pinned,
 instance-checked collector as Properties, even for unopened dialogs. A 150 ms
 input debounce coalesces typing. Owned batches report matches and progress;
 request IDs reject obsolete batches, and each match must still have the source
@@ -448,7 +448,6 @@ exercise synthetic observations; they do not establish live hardware coverage.
 
 API references:
 - https://www.freedesktop.org/software/systemd/man/latest/udev_monitor_receive_device.html
-- https://doc.qt.io/qt-6/qabstractitemmodel.html#beginMoveRows
 
 ## Resource projections
 
@@ -459,7 +458,7 @@ access moves to the model. Resource changes participate in metadata comparison,
 so live/F5/periodic snapshots update assignment rows even if a device label and
 generation remain unchanged. Properties retains its independently timed collection.
 
-resourceformat is a Qt Core-only formatter shared by the Resources tab and both
+resourceformat is a toolkit-free formatter shared by the Resources tab and both
 resource projections. It preserves the existing translation context and tab text,
 exposes untranslated group IDs, and supplies stable row keys based on source/type/
 slot/range/mode with duplicate suffixes. Presentation never claims exclusive
